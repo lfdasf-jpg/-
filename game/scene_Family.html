@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>情緒大冒險 - Family Challenge</title>
+    <style>
+        :root {
+            --primary-pink: #ffb7c5;
+            --stress-red: #ff4d4d;
+            --calm-blue: #4db8ff;
+            --text-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+
+        #game-container {
+            position: relative;
+            width: 100vw; height: 100vh;
+            background-color: #222;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1s ease-in-out;
+            display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+        }
+
+        /* 角色立繪 (在對話框後方，靠左對齊，最佳化去背與位置) */
+        #character-sprite {
+            position: absolute;
+            bottom: 15vh;  /* 將角色向上移動，避免被對話框擋住太多 */
+            left: 5%;      /* 稍微往左靠一點，留更多空間給對話框 */
+            height: 75vh;  /* 從 85vh 縮小到 75vh，比例更剛好 */
+            max-width: 45vw;
+            object-fit: contain;
+            z-index: 5;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            opacity: 0;
+            transform: translateX(-20px);
+            pointer-events: none;
+
+            /* 👇 程式碼去背黑科技：將純白背景變透明，解決圖片白色方塊遮擋背景的問題 */
+            mix-blend-mode: multiply;
+        }
+
+        /* 狀態欄 (右上角) */
+        #status-bars {
+            position: absolute; top: 20px; right: 20px; width: 280px;
+            background: rgba(0, 0, 0, 0.85); padding: 15px; border-radius: 12px; z-index: 100;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .bar-container { margin-bottom: 10px; }
+        .bar-label { color: white; font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: bold; }
+        .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; }
+        .bar-fill { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        #stress-fill { background: var(--stress-red); box-shadow: 0 0 8px var(--stress-red); }
+        #calm-fill { background: var(--calm-blue); box-shadow: 0 0 8px var(--calm-blue); }
+
+        /* 背景描述標籤 (左上角) */
+        #bg-info-panel {
+            position: absolute; top: 20px; left: 20px;
+            max-width: 400px; background: rgba(0, 0, 0, 0.7);
+            color: white; padding: 15px; border-radius: 10px;
+            border-left: 5px solid var(--primary-pink); z-index: 100;
+        }
+        .bg-zh { font-size: 14px; font-weight: bold; line-height: 1.4; }
+        .bg-en { font-size: 12px; color: #ccc; margin-top: 5px; font-style: italic; line-height: 1.3; }
+
+        /* UI 佈局容器 */
+        #bottom-ui-wrapper {
+            width: 85%; max-width: 1100px; margin-bottom: 40px;
+            display: flex; flex-direction: column; align-items: flex-end; z-index: 10;
+        }
+
+        /* 選項按鈕區 */
+        #options-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+
+        .option-btn {
+            background: white; border: 2px solid var(--primary-pink); padding: 10px 20px;
+            border-radius: 20px 0px 20px 20px; cursor: pointer; font-size: 1rem;
+            transition: all 0.2s ease; box-shadow: -4px 4px 10px rgba(0,0,0,0.1);
+            text-align: left; min-width: 320px; max-width: 650px;
+        }
+        .option-btn:hover { background: var(--primary-pink); color: white; transform: translateX(-5px); }
+        .opt-eng { display: block; font-size: 0.8rem; opacity: 0.7; margin-top: 2px; }
+
+        /* 對話框 */
+        #dialogue-box {
+            width: 100%; background: var(--text-bg); border: 4px solid var(--primary-pink);
+            border-radius: 20px; padding: 25px; box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-height: 180px;
+        }
+        #speaker-name { font-weight: bold; color: #d66d75; font-size: 1.25rem; margin-bottom: 10px; border-bottom: 2px solid var(--primary-pink); display: inline-block; }
+        #text-content { font-size: 1.1rem; line-height: 1.6; color: #333; }
+        .eng-text { display: block; font-size: 0.95rem; color: #666; margin-top: 8px; font-style: italic; border-left: 3px solid #eee; padding-left: 10px; }
+
+        .explanation { color: #d66d75; font-weight: bold; font-size: 0.9rem; display: block; margin-top: 15px; border-top: 2px dashed #ffb7c5; padding-top: 10px; }
+        .exp-eng { display: block; font-size: 0.85rem; color: #777; font-weight: normal; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="bg-info-panel">
+        <div id="bg-zh-text" class="bg-zh">載入中...</div>
+        <div id="bg-en-text" class="bg-en">Loading...</div>
+    </div>
+
+    <div id="status-bars">
+        <div class="bar-container">
+            <div class="bar-label">😰 壓力 Stress <span id="stress-val">40%</span></div>
+            <div class="bar-bg"><div id="stress-fill" class="bar-fill" style="width: 40%;"></div></div>
+        </div>
+        <div class="bar-container">
+            <div class="bar-label">🌿 舒緩 Calm <span id="calm-val">0%</span></div>
+            <div class="bar-bg"><div id="calm-fill" class="bar-fill" style="width: 0%;"></div></div>
+        </div>
+    </div>
+
+    <img id="character-sprite">
+
+    <div id="bottom-ui-wrapper">
+        <div id="options-container"></div>
+        <div id="dialogue-box">
+            <div id="speaker-name"></div>
+            <div id="text-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let stats = { stress: 40, calm: 0 };
+    let memory = { q1: false, q2: false };
+
+    const charImgs = {
+        angry: "angry.png",
+        scared: "scared.png",
+        playful: "playful.png",
+        sad: "sad.png",
+        happy: "happy.png",
+        crying: "crying.png"
+    };
+
+    const bgs = {
+        room: "https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=2069",
+        messyRoom: "https://images.unsplash.com/photo-1593696140826-c58b021acf8b?q=80&w=2070",
+        livingRoom: "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?q=80&w=2070",
+        study: "https://images.unsplash.com/photo-1525011268546-bf3f9b007f6a?q=80&w=2070"
+    };
+
+    const easterEggs = [
+        {
+            speaker: "✨ 彩蛋：妹妹藏東西",
+            charImg: charImgs.playful,
+            text: "妹妹：嘿嘿！哥找到就陪我玩！<br><span class='eng-text'>Sister: Hehe! If you find it, play with me!</span><br><br>你（冷靜笑）：下次直接說想玩就好，不用藏。<br><span class='eng-text'>You (smile calmly): Just tell me you want to play next time, no need to hide it.</span>"
+        },
+        {
+            speaker: "✨ 彩蛋：妹妹變小幫手",
+            charImg: charImgs.happy,
+            text: "妹妹：哥我幫你收拾！以後我保護你的模型！<br><span class='eng-text'>Sister: I'll help you clean up! I'll protect your models from now on!</span><br><br>你看著她認真的模樣，心裡的煩躁瞬間消失了。<br><span class='eng-text'>Seeing her serious look, your annoyance vanishes instantly.</span>"
+        },
+        {
+            speaker: "✨ 彩蛋：妹妹當小老師",
+            charImg: charImgs.happy,
+            text: "你（壓力上來）：……<br><span class='eng-text'>You (feeling stressed): ...</span><br><br>妹妹：哥！深呼吸～慢慢來～不生氣～<br><span class='eng-text'>Sister: Brother! Deep breaths~ Take it easy~ Don't be mad~</span><br>你跟著她做了一次深呼吸，忍不住笑了出來。<br><span class='eng-text'>You follow her to take a deep breath and can't help but laugh.</span>"
+        }
+    ];
+
+    const scenes = {
+        start: {
+            bg_zh: "【開場】週六下午，你在房間專心拼心愛的機甲模型。妹妹突然推門衝進，一把抓起模型零件：「哥！陪我玩啦～你都不理我！」",
+            bg_en: "[Opening] Saturday afternoon, you're focused on building a mecha model. Sister bursts in: 'Brother! Play with me!'",
+            bgImg: "fn_1.png",
+            charImg: charImgs.angry,
+            speaker: "你 / You",
+            text: "「（手一抖，模型摔散）……！」<br>內心對話：好不容易拼到一半，全毀了！她永遠都這樣不看場合！",
+            eng: "(Hand shakes, model falls apart)...!<br>Inner thought: Halfway done, completely ruined! She never reads the room!",
+            options: [
+                { text: "怒吼：「你煩不煩！動我東西幹嘛！」", eng: "Yell: 'Are you annoying or what! Why touch my things!'", next: "stage1", s: 30, c: -10 },
+                { text: "握拳忍著，轉過身不說話", eng: "Clench fists, turn away in silence", next: "stage1", s: 15, c: 0 },
+                { text: "壓住火氣輕聲說：「我現在在忙，等下陪你。」", eng: "Suppress anger and say softly: 'I'm busy, I'll play later.'", next: "stage1", s: -5, c: 15 }
+            ]
+        },
+        stage1: {
+            bg_zh: "【第一關：情緒辨識屋】<br>房間凌亂，模型零件散落一地。妹妹蹲在地上，害怕縮脖子：「我… 不是故意的…我只是想跟你玩…」",
+            bg_en: "[Stage 1: Emotion Room]<br>Messy room. Sister squats, shrinking back: 'I... didn't mean to... I just wanted to play...'",
+            bgImg: "fn_2.png",
+            charImg: charImgs.scared,
+            speaker: "情緒精靈 / Emotion Sprite",
+            text: "任務：辨識「自己的情緒」+「妹妹的情緒」",
+            eng: "Mission: Identify 'Your Emotion' + 'Sister's Emotion'",
+            options: [{ text: "開始辨識", eng: "Start Identification", next: "s1_q1", s: 0, c: 0 }]
+        },
+        s1_q1: {
+            bg_zh: "【第一關：情緒辨識屋】", bg_en: "[Stage 1: Emotion Room]", bgImg: "fn_2.png",
+            charImg: charImgs.scared,
+            speaker: "選擇 1 / Choice 1",
+            text: "你現在真正生氣的是？", eng: "What is the true reason for your anger right now?",
+            options: [
+                { text: "氣妹妹故意搗蛋", eng: "Angry she deliberately caused trouble", next: "s1_q2", s: 20, c: 0, action: ()=> memory.q1=false },
+                { text: "氣自己沒保護好模型", eng: "Angry at myself for not protecting the model", next: "s1_q2", s: 10, c: 0, action: ()=> memory.q1=false },
+                { text: "心愛的東西被破壞 + 專心被打斷", eng: "Cherished item destroyed + focus interrupted", next: "s1_q2", s: -10, c: 20, action: ()=> memory.q1=true }
+            ]
+        },
+        s1_q2: {
+            bg_zh: "【第一關：情緒辨識屋】", bg_en: "[Stage 1: Emotion Room]", bgImg: "fn_2.png",
+            charImg: charImgs.scared,
+            speaker: "選擇 2 / Choice 2",
+            text: "妹妹搗亂的原因是？", eng: "What is the reason for your sister's misbehavior?",
+            options: [
+                { text: "她就是討厭、想惹我生氣", eng: "She is annoying and wants to make me mad", next: "s1_eval", s: 15, c: 0, action: ()=> memory.q2=false },
+                { text: "孤單無聊、想被陪伴、不知道模型很重要", eng: "Lonely, wants company, doesn't know the model is important", next: "s1_eval", s: -15, c: 20, action: ()=> memory.q2=true }
+            ]
+        },
+        s1_eval: {
+            bg_zh: "【第一關：關卡結算】", bg_en: "[Stage 1: Evaluation]", bgImg: "fn_2.png",
+            charImg: charImgs.scared,
+            speaker: "關卡結算 / Evaluation",
+            text: () => {
+                let res_zh = "你（學會辨識後）：我現在真的很生氣，但我不是恨你，是我的模型壞了，我很難過。<br>妹妹（眼眶紅）：對不起… 我以為你不想跟我玩…<br><br>";
+                let res_en = "You: I'm really angry, but I don't hate you. My model is broken and I'm sad.<br>Sister (tearing up): Sorry... I thought you didn't want to play...<br><br>";
+                if (memory.q1 && memory.q2) {
+                    res_zh += "<b>【完美辨識！】舒緩值大增，壓力歸零。</b>"; res_en += "<b>[Perfect Identification!] Calm increased heavily, Stress cleared.</b>";
+                    stats.calm += 40; stats.stress = 0;
+                } else if (!memory.q1 && !memory.q2) {
+                    res_zh += "<b>【辨識失敗】未找到真正原因，壓力飆升！</b>"; res_en += "<b>[Identification Failed] True reasons missed, Stress spikes!</b>";
+                    stats.stress += 30;
+                } else {
+                    res_zh += "<b>【部分正確】壓力殘留，但有些許舒緩。</b>"; res_en += "<b>[Partially Correct] Stress remains, but slightly calmed.</b>";
+                    stats.stress = 20; stats.calm += 10;
+                }
+                return { zh: res_zh, en: res_en };
+            },
+            options: [{ text: "前往客廳", eng: "Go to Living Room", next: "stage2", s: 0, c: 0 }]
+        },
+        stage2: {
+            bg_zh: "【第二關：冷靜停頓森林】<br>你想轉移注意力，來到客廳冷靜看動畫。妹妹卻跟了出來，搶走遙控器、擋住電視。",
+            bg_en: "[Stage 2: Calm Down Forest]<br>You go to the living room to watch anime. Sister follows, snatches the remote, and blocks the TV.",
+            bgImg: "fn_3.png",
+            charImg: charImgs.playful,
+            speaker: "妹妹 / Sister",
+            text: "「略略略～哥不理我我就鬧！」<br><br><span style='color:var(--stress-red);font-weight:bold;'>警告！壓力值大幅上升！請立刻「冷靜剎車」！你要怎麼做？</span>",
+            eng: "'Blah blah blah~ If you ignore me, I'll make a mess!'<br><br><span style='color:var(--stress-red);font-weight:bold;'>Warning! Stress spiking! 'Hit the brakes' immediately!</span>",
+            options: [
+                { text: "推開她、摔遙控器：「滾開！」", eng: "Push her, throw remote: 'Get lost!'", next: "stage3", s: 40, c: 0 },
+                { text: "閉眼深呼吸、數 10 秒", eng: "Close eyes, deep breath, count to 10", next: "s2_warm", s: -20, c: 25 },
+                { text: "起身去廚房喝水，離開現場", eng: "Get up, go to kitchen for water", next: "s2_warm", s: -15, c: 20 },
+                { text: "罵她：「你真的很討人厭」", eng: "Scold her: 'You are really annoying'", next: "stage3", s: 30, c: -15 }
+            ]
+        },
+        s2_warm: {
+            bg_zh: "【第二關：冷靜停頓森林】", bg_en: "[Stage 2: Calm Down Forest]", bgImg: "fn_5.png",
+            charImg: charImgs.scared,
+            speaker: "擦邊暖心互動 / Warm Interaction",
+            text: "看見你突然不說話，妹妹以為你真的生氣不要她了。<br>她小心翼翼拉拉你的衣角，塞了一顆糖到你手心：「哥… 不要生氣了，給你糖糖…」",
+            eng: "Seeing you quiet, she thinks you are really mad.<br>She carefully tugs your shirt and gives you a candy: 'Brother... don't be mad, here's a candy...'",
+            exp_zh: "情緒來時，先停頓，不做後悔的事。",
+            exp_en: "When emotions hit, pause first to avoid actions you'll regret.",
+            options: [{ text: "進入書房好好談談", eng: "Go to study to talk", next: "stage3", s: 0, c: 0 }]
+        },
+        stage3: {
+            bg_zh: "【第三關：共情溝通橋】<br>書房裡亮起溫暖的燈光，你和妹妹面對面，準備正式解決矛盾。",
+            bg_en: "[Stage 3: Empathy Bridge]<br>Warm light fills the study. You and your sister face each other to resolve the conflict.",
+            bgImg: "fn_4.png",
+            charImg: charImgs.sad,
+            speaker: "情緒精靈 / Emotion Sprite",
+            text: "請用「我語句」表達，不責備、只說感受！你要怎麼跟妹妹說？",
+            eng: "Use 'I-statements' to express feelings without blaming! What will you say?",
+            options: [
+                { text: "「你總是亂動我東西，超討厭！」", eng: "'You always touch my things, it's so annoying!'", next: "s3_q2", s: 30, c: 0 },
+                { text: "「你再動我東西，我就不跟你好了」", eng: "'If you touch my things again, we are not friends'", next: "s3_q2", s: 10, c: 0 },
+                { text: "「妹妹，你動我模型我會很難過，這是我很珍惜的東西；想玩先問我，我陪你」", eng: "'Sister, I feel sad when you touch my model. Ask first, and I'll play.'", next: "s3_q2", s: -30, c: 35 }
+            ]
+        },
+        s3_q2: {
+            bg_zh: "【第三關：共情溝通橋】", bg_en: "[Stage 3: Empathy Bridge]", bgImg: "fn_0.png",
+            charImg: charImgs.sad,
+            speaker: "妹妹的心聲 / Sister's True Feelings",
+            text: "妹妹低著頭說：「我以為你不喜歡跟我玩… 我一個人好無聊…」<br><br>聽到這裡，你怎麼回？",
+            eng: "Sister whispers: 'I thought you didn't like playing with me... I was bored...'<br><br>How do you reply?",
+            options: [
+                { text: "「無聊就自己玩，別來煩我」", eng: "'Play by yourself. Don't bother me.'", next: "check_ending", s: 20, c: 0 },
+                { text: "「對不起，我忽略你了，以後我每天陪你」", eng: "'Sorry, I ignored you. I will play with you every day.'", next: "s3_warm", s: -25, c: 30 },
+                { text: "「知道了，下次不要鬧就好」", eng: "'Got it, just don't make a mess next time.'", next: "check_ending", s: 0, c: 5 }
+            ]
+        },
+        s3_warm: {
+            bg_zh: "【第三關：共情溝通橋】", bg_en: "[Stage 3: Empathy Bridge]", bgImg: "fn_6.png",
+            charImg: charImgs.happy,
+            speaker: "兄妹和解 / Reconciliation",
+            text: "妹妹突然撲進你懷裡抱緊你：「哥最好了！我以後一定先問你！我最喜歡你了！」<br>你笑著摸摸她的頭，牽起她小小的手：「嗯，一起玩。」",
+            eng: "She hugs you tightly: 'You're the best! I'll ask first next time! I love you!'<br>You smile, pat her head, and hold her hand: 'Yeah, let's play.'",
+            options: [{ text: "查看最終結果", eng: "Check Final Result", next: "check_ending", s: 0, c: 0 }]
+        }
+    };
+
+    function updateBars() {
+        stats.stress = Math.max(0, Math.min(100, stats.stress));
+        stats.calm = Math.max(0, Math.min(100, stats.calm));
+        document.getElementById('stress-fill').style.width = stats.stress + "%";
+        document.getElementById('stress-val').innerText = stats.stress + "%";
+        document.getElementById('calm-fill').style.width = stats.calm + "%";
+        document.getElementById('calm-val').innerText = stats.calm + "%";
+    }
+
+    function updateCharacter(imgSrc) {
+        const charSprite = document.getElementById('character-sprite');
+        if (imgSrc) {
+            charSprite.src = imgSrc;
+            charSprite.style.opacity = "1";
+            charSprite.style.transform = "translateX(0px)";
+        } else {
+            charSprite.style.opacity = "0";
+            charSprite.style.transform = "translateX(-20px)";
+        }
+    }
+
+    function showEasterEgg(nextKey) {
+        const egg = easterEggs[Math.floor(Math.random() * easterEggs.length)];
+
+        updateCharacter(egg.charImg);
+
+        document.getElementById('speaker-name').innerText = egg.speaker;
+        document.getElementById('text-content').innerHTML = `<div>${egg.text}</div>`;
+
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `繼續冒險 ➔<span class="opt-eng">Continue Adventure ➔</span>`;
+        btn.onclick = () => renderScene(nextKey);
+        container.appendChild(btn);
+    }
+
+    function renderScene(key) {
+        if (key === "check_ending") { showEnding(); return; }
+
+        const scene = scenes[key];
+        if (!scene) return;
+
+        if (scene.bg_zh) {
+            document.getElementById('bg-zh-text').innerHTML = scene.bg_zh;
+            document.getElementById('bg-en-text').innerText = scene.bg_en;
+            document.getElementById('game-container').style.backgroundImage = `url('${scene.bgImg}')`;
+        }
+
+        // 更新圖片
+        updateCharacter(scene.charImg);
+
+        document.getElementById('speaker-name').innerText = scene.speaker;
+
+        let contentHtml = "";
+        if (typeof scene.text === 'function') {
+            let texts = scene.text();
+            contentHtml = `<div>${texts.zh}</div><div class="eng-text">${texts.en}</div>`;
+            updateBars();
+        } else {
+            contentHtml = `<div>${scene.text}</div><div class="eng-text">${scene.eng}</div>`;
+            if (scene.exp_zh) {
+                contentHtml += `<div class="explanation">💡 心理筆記 / Psychology Note:<br>${scene.exp_zh}<span class="exp-eng">${scene.exp_en}</span></div>`;
+            }
+        }
+        document.getElementById('text-content').innerHTML = contentHtml;
+
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        scene.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerHTML = `${opt.text}<span class="opt-eng">${opt.eng}</span>`;
+
+            // 👇 修改部分：移除了中途數值達到 80 就強制結束的判斷，確保遊戲會走到最後
+            btn.onclick = () => {
+                if(opt.action) opt.action();
+                stats.stress += opt.s;
+                stats.calm += opt.c;
+                updateBars();
+
+                if (Math.random() < 0.25 && (opt.next === 'stage2' || opt.next === 'stage3')) {
+                    showEasterEgg(opt.next);
+                } else {
+                    renderScene(opt.next);
+                }
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    function showEnding(isForcedBad = false) {
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        const speaker = document.getElementById('speaker-name');
+        const text = document.getElementById('text-content');
+
+        document.getElementById('status-bars').style.display = 'none';
+        document.getElementById('bg-info-panel').style.display = 'none';
+
+        if (!isForcedBad && stats.calm >= 60 && stats.stress <= 40) {
+            document.getElementById('game-container').style.backgroundImage = `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=2070')`;
+            speaker.innerText = "💖 好結局 / Good Ending";
+            updateCharacter(charImgs.happy);
+            speaker.style.color = "#4db8ff";
+            speaker.style.borderBottomColor = "#4db8ff";
+            text.innerHTML = "晚上客廳，暖燈。你和妹妹一起修模型。媽媽端水果進來：「今天哥哥都沒有發脾氣，還會照顧妹妹，真的長大了！」<br><br><b>【成長報告】從「被情緒控制」 ➔ 成長為「管理情緒」</b><br>你學會了辨識（氣的是事件不是人）、冷靜（踩剎車不衝動）與共情（看懂妹妹的孤單）。<br>✨ 你真正做到：有情緒，但不被情緒帶走；愛妹妹，也保護好自己的心情。<div class='eng-text'>Emotional Warrior: You learned to pause, identify emotions, and use empathetic communication. You protect your boundaries while cherishing your sister.</div>";
+        } else {
+            document.getElementById('game-container').style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('fn_7.png')`;
+            speaker.innerText = "💔 壞結局 / Bad Ending";
+            updateCharacter(charImgs.crying);
+            speaker.style.color = "#ff4d4d";
+            speaker.style.borderBottomColor = "#ff4d4d";
+            text.innerHTML = "你對妹妹大吼，她哭著跑出去：「哥討厭我…以後不敢找你玩了…」你雖然冷靜下來，但充滿自責。<br><br><b>【成長報告】你仍停留在「情緒的奴隸」階段</b><br>無法辨識情緒（遷怒妹妹）、無法停頓（衝動爆發）、無法共情（看不見她的需求）。<br>💔 情緒爆發一時痛快，但留下的是後悔與距離。<div class='eng-text'>Emotional Slave: You let anger control you, resulting in verbal hurt and distance. The broken model is matched by a broken relationship.</div>";
+        }
+
+        const btnReset = document.createElement('button');
+        btnReset.className = 'option-btn';
+        btnReset.innerHTML = `🔄 重新挑戰<span class="opt-eng">Retry Challenge</span>`;
+        btnReset.onclick = () => location.reload();
+        container.appendChild(btnReset);
+
+        const btnHome = document.createElement('button');
+        btnHome.className = 'option-btn';
+        btnHome.innerHTML = `🏠 返回首頁<span class="opt-eng">Back to Home</span>`;
+        btnHome.onclick = () => { window.location.href = 'home.html'; };
+        container.appendChild(btnHome);
+    }
+
+    updateBars();
+    renderScene('start');
+</script>
+</body>
+</html>
