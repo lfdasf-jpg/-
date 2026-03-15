@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>情緒大冒險 - Anxy's Social Challenge</title>
+    <style>
+        :root {
+            --primary-pink: #ffb7c5;
+            --stress-red: #ff4d4d;
+            --calm-blue: #4db8ff;
+            --text-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+
+        #game-container {
+            position: relative;
+            width: 100vw; height: 100vh;
+            background-color: #222;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1s ease-in-out;
+            display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+        }
+
+        /* 狀態欄 (右上角) */
+        #status-bars {
+            position: absolute; top: 20px; right: 20px; width: 280px;
+            background: rgba(0, 0, 0, 0.85); padding: 15px; border-radius: 12px; z-index: 100;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .bar-container { margin-bottom: 10px; }
+        .bar-label { color: white; font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: bold; }
+        .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; }
+        .bar-fill { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        #stress-fill { background: var(--stress-red); box-shadow: 0 0 8px var(--stress-red); }
+        #calm-fill { background: var(--calm-blue); box-shadow: 0 0 8px var(--calm-blue); }
+
+        /* 背景描述標籤 (左上角) - 中英對照 */
+        #bg-info-panel {
+            position: absolute; top: 20px; left: 20px;
+            max-width: 400px; background: rgba(0, 0, 0, 0.7);
+            color: white; padding: 15px; border-radius: 10px;
+            border-left: 5px solid var(--primary-pink); z-index: 100;
+        }
+        .bg-zh { font-size: 14px; font-weight: bold; line-height: 1.4; }
+        .bg-en { font-size: 12px; color: #ccc; margin-top: 5px; font-style: italic; line-height: 1.3; }
+
+        /* UI 佈局容器 */
+        #bottom-ui-wrapper {
+            width: 85%; max-width: 1100px; margin-bottom: 40px;
+            display: flex; flex-direction: column; align-items: flex-end; z-index: 10;
+        }
+
+        /* 選項按鈕區 */
+        #options-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+
+        .option-btn {
+            background: white; border: 2px solid var(--primary-pink); padding: 10px 20px;
+            border-radius: 20px 0px 20px 20px; cursor: pointer; font-size: 1rem;
+            transition: all 0.2s ease; box-shadow: -4px 4px 10px rgba(0,0,0,0.1);
+            text-align: left; min-width: 320px; max-width: 650px;
+        }
+        .option-btn:hover { background: var(--primary-pink); color: white; transform: translateX(-5px); }
+        .opt-eng { display: block; font-size: 0.8rem; opacity: 0.7; margin-top: 2px; }
+
+        /* 對話框 */
+        #dialogue-box {
+            width: 100%; background: var(--text-bg); border: 4px solid var(--primary-pink);
+            border-radius: 20px; padding: 25px; box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-height: 180px;
+        }
+        #speaker-name { font-weight: bold; color: #d66d75; font-size: 1.25rem; margin-bottom: 10px; border-bottom: 2px solid var(--primary-pink); display: inline-block; }
+        #text-content { font-size: 1.1rem; line-height: 1.6; color: #333; }
+        .eng-text { display: block; font-size: 0.95rem; color: #666; margin-top: 8px; font-style: italic; border-left: 3px solid #eee; padding-left: 10px; }
+
+        .explanation { color: #d66d75; font-weight: bold; font-size: 0.9rem; display: block; margin-top: 15px; border-top: 2px dashed #ffb7c5; padding-top: 10px; }
+        .exp-eng { display: block; font-size: 0.85rem; color: #777; font-weight: normal; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="bg-info-panel">
+        <div id="bg-zh-text" class="bg-zh">載入中...</div>
+        <div id="bg-en-text" class="bg-en">Loading...</div>
+    </div>
+
+    <div id="status-bars">
+        <div class="bar-container">
+            <div class="bar-label">😰 壓力 Stress <span id="stress-val">50%</span></div>
+            <div class="bar-bg"><div id="stress-fill" class="bar-fill" style="width: 50%;"></div></div>
+        </div>
+        <div class="bar-container">
+            <div class="bar-label">🌿 舒緩 Calm <span id="calm-val">50%</span></div>
+            <div class="bar-bg"><div id="calm-fill" class="bar-fill" style="width: 50%;"></div></div>
+        </div>
+    </div>
+
+    <div id="bottom-ui-wrapper">
+        <div id="options-container"></div>
+        <div id="dialogue-box">
+            <div id="speaker-name"></div>
+            <div id="text-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let stats = { stress: 50, calm: 50 };
+
+    const scenes = {
+        start: {
+            bg_zh: "背景：大家在教室裡大聲笑鬧。Anxy 站在門口，手指不停地攪動衣角，呼吸開始變得急促。",
+            bg_en: "Background: Everyone is laughing and chatting loudly in the classroom. Anxy stands at the door, fidgeting with her clothes, her breathing quickening.",
+            bgImg: "f_1_scene.png",
+            speaker: "Anxy",
+            text: "「裡面人好多……如果我進去打招呼，大家突然安靜下來看我怎麼辦？我、我還是回宿舍好了……」",
+            eng: "There are so many people... If I go in and say hi, what if everyone suddenly goes silent and stares at me? I'd better go back to the dorm...",
+            options: [
+                { text: "「別逃避了，這只是普通的聚會，進去就沒事了。」", eng: "Stop escaping. This is just a normal party. You'll be fine.", next: "act1_a", change: 20 },
+                { text: "「我們試試深呼吸。吸氣……吐氣……專注在我的聲音上。」", eng: "Let's try deep breathing. Inhale... exhale... focus on my voice.", next: "act1_b", change: -20 },
+                { text: "「如果你真的不想進去，我們在門口觀察一下？」", eng: "If you really don't want to go in, shall we observe from the door?", next: "act1_c", change: -10 }
+            ]
+        },
+        act1_a: {
+            speaker: "Anxy",
+            text: "「對你來說當然簡單……（把帽檐拉得更低）我覺得胸口好悶，快要不能呼吸了。」",
+            eng: "It's easy for you... (Pulls hat lower) My chest feels tight, I can't breathe.",
+            exp_zh: "這屬於「強迫暴露」。會觸發大腦的戰或逃反應，讓焦慮者將社交環境與「窒息感」產生負面聯結。",
+            exp_en: "This is 'Forced Exposure', triggering Fight-or-Flight and negative associations.",
+            options: [{ text: "繼續前進 / Continue", next: "act2", change: 0 }]
+        },
+        act1_b: {
+            speaker: "Anxy",
+            text: "「（肩膀放鬆了一點）呼……好，我感覺好一點了。我們……只待十分鐘就好，可以嗎？」",
+            eng: "(Shoulders relax) Phew... okay, better. Let's stay for only 10 minutes, okay?",
+            exp_zh: "這是深呼吸法 (Deep Breathing)。激活副交感神經，從生理層面切斷焦慮信號。",
+            exp_en: "Deep Breathing activates the parasympathetic nervous system to lower heart rate.",
+            options: [{ text: "進入教室 / Enter", next: "act2", change: 0 }]
+        },
+        act1_c: {
+            speaker: "Anxy",
+            text: "「觀察嗎？好……這樣壓力好像小一點。」",
+            eng: "Observe? Okay... feels a bit less pressuring.",
+            exp_zh: "這是「微小的漸進式暴露」。確認環境安全能降低對未知的恐懼。",
+            exp_en: "Gradual Exposure. Confirming safety helps reduce fear of the unknown.",
+            options: [{ text: "片刻後進入 / Enter after a while", next: "act2", change: 0 }]
+        },
+        act2: {
+            bg_zh: "背景：一位熱心的同學走過來：「嘿！你們怎麼站在門口？要不要一起來玩桌遊？」",
+            bg_en: "Background: An enthusiastic classmate walks over: 'Hey! Why are you standing at the door? Want to play board games together?'",
+            bgImg: "f_2_scene.png",
+            speaker: "Anxy",
+            text: "「（身體僵硬，躲在你身後小聲說）你幫我拒絕他……我不知道該說什麼。」",
+            eng: "(Body stiffens, hiding behind you) Help me say no... I don't know what to say.",
+            options: [
+                { text: "替她擋下：「喔，她今天有點累，我們待會再過去。」", eng: "Help her: 'She's a bit tired today, we'll join later.'", next: "act2_a", change: 15 },
+                { text: "鼓勵她開口：「試著告訴他你的名字就好，我也在這邊。」", eng: "Encourage her: 'Just try telling him your name. I'm right here.'", next: "act2_b", change: -25 }
+            ]
+        },
+        act2_a: { speaker: "System", text: "暫時緩解但強化了依賴與焦慮觸發。", eng: "Temporarily relieved but reinforced dependency.", exp_zh: "逃避行為雖然瞬間降低壓力，但長遠來看會固化焦慮。", exp_en: "Avoidance briefly lowers stress but solidifies anxiety long-term.", options: [{ text: "分組討論 / Group Discussion", next: "act3", change: 0 }] },
+        act2_b: { speaker: "Anxy", text: "「（顫抖地）我……我叫 Anxy。很高興……認識你。」", eng: "(Trembling) I... I'm Anxy. Nice to meet you.", exp_zh: "建立微小正面回饋，減少被評判的恐懼。", exp_en: "Building small positive feedback to reduce fear of judgment.", options: [{ text: "分組討論 / Group Discussion", next: "act3", change: 0 }] },
+
+        act3: {
+            bg_zh: "背景：聚會中，大家開始分組玩桌遊或聊天。Anxy 縮在椅子上，試圖讓自己不被看見。",
+            bg_en: "Background: People start grouping for games or chats. Anxy huddles in her chair, trying to stay invisible.",
+            bgImg: "f_3_scene.png",
+            speaker: "Anxy",
+            text: "「（低聲說）大家都聊得好快……如果我現在開口，會不會顯得很突兀？大家會不會覺得我是個怪人？」",
+            eng: "Everyone talks so fast... if I speak now, will it be sudden? Will they think I'm a freak?",
+            options: [
+                { text: "「別想太多，直接大聲說出你的想法就好！」", eng: "Just say your thoughts out loud!", next: "act3_a", change: 20 },
+                { text: "「觀察一個人的表情，停頓時你點點頭示意就好。」", eng: "Watch their faces. Just nod when they pause.", next: "act3_b", change: -15 },
+                { text: "「我們練習『正念轉移』，專注感受飲料杯的溫度。」", eng: "Let's practice 'Mindfulness'. Feel the temperature of your cup.", next: "act3_c", change: -20 }
+            ]
+        },
+        act3_a: { speaker: "Anxy", text: "「（手開始發抖）不……我做不到，這樣大家都會看著我。」", eng: "No... I can't. Everyone will stare.", exp_zh: "「聚光燈效應」會增加被評判的恐懼，導致壓力上升。", exp_en: "The Spotlight Effect increases fear of judgment, raising stress.", options: [{ text: "拿出手機 / Check Phone", next: "act4", change: 0 }] },
+        act3_b: { speaker: "Anxy", text: "「只是點頭嗎？好……這我應該可以試試。」", eng: "Just nodding? Okay... I think I can try that.", exp_zh: "「非言語溝通」能降低難度並獲得正面回饋。", exp_en: "Non-verbal communication lowers social difficulty and gains positive feedback.", options: [{ text: "繼續參與 / Continue", next: "act4", change: 0 }] },
+        act3_c: { speaker: "Anxy", text: "「（握緊杯子）冰冰的……呼吸好像順暢一點了。」", eng: "(Holding cup) It's cold... my breathing feels smoother.", exp_zh: "「正念轉移」能中斷焦慮的負面循環。", exp_en: "Mindfulness interrupts the negative cycle of anxiety.", options: [{ text: "繼續參與 / Continue", next: "act4", change: 0 }] },
+
+        act4: {
+            bg_zh: "背景：聚會中途，Anxy 拿出手機，臉色突然變得很難看。發給同學的訊息被「已讀不回」。",
+            bg_en: "Background: Midway through the party, Anxy checks her phone. Her face drops. Her message has been 'Read' with no reply.",
+            bgImg: "f_4_scene.png",
+            speaker: "Anxy",
+            text: "「小明讀了訊息但不回我……他是不是覺得我很煩？我剛才表現得那麼怪，他一定是在跟別人抱怨我……」",
+            eng: "Xiao Ming read but didn't reply... does he find me annoying? He must be complaining about me...",
+            options: [
+                { text: "「可能他在忙吧？再發一條訊息問清楚。」", eng: "Maybe he's busy? Send another message to ask.", next: "act4_a", change: 25 },
+                { text: "「這是『讀心術』認知陷阱。我們先放下手機吧。」", eng: "This is a 'Mind-Reading' cognitive trap. Put the phone down.", next: "act4_b", change: -20 }
+            ]
+        },
+        act4_a: { speaker: "System", text: "小明依然沒回，Anxy 開始反覆刷新螢幕。", eng: "Still no reply. Anxy keeps refreshing the screen.", exp_zh: "「尋求保證」的強迫行為會放大社交反芻焦慮。", exp_en: "Reassurance-seeking intensifies anxiety from social rumination.", options: [{ text: "發生意外 / Something happens", next: "act5", change: 0 }] },
+        act4_b: { speaker: "Anxy", text: "「好吧，也許他在洗澡。」", eng: "Well, maybe he's showering.", exp_zh: "「挑戰負面思想」辨識認知陷阱，能理智處理壓力。", exp_en: "Challenging negative thoughts helps handle stress rationally.", options: [{ text: "發生意外 / Something happens", next: "act5", change: 0 }] },
+
+        act5: {
+            bg_zh: "背景：一位同學不小心打翻了飲料，液體濺到了 Anxy 的鞋子上。周圍的人都看了過來。",
+            bg_en: "Background: A classmate accidentally spills a drink on Anxy's shoes. Everyone around turns to look.",
+            bgImg: "f_5_scene.png",
+            speaker: "Anxy",
+            text: "「（瞬間僵住，把帽子拉到最低）完了……大家都在看我。我現在一定看起來很狼狽……」",
+            eng: "It's over... everyone is looking. I must look so pathetic right now...",
+            options: [
+                { text: "趕快帶她衝出教室去廁所清理。", eng: "Lead her out to the restroom immediately to clean up.", next: "act6", change: 15 },
+                { text: "遞給她紙巾，引導她一起做 3 次深呼吸再處理。", eng: "Give her a tissue and guide her through 3 deep breaths.", next: "act5_b", change: -25 }
+            ]
+        },
+        act5_b: { speaker: "Anxy", text: "「（吸氣……吐氣）只是鞋子髒了，我們一起擦乾淨就好。」", eng: "(Inhale... Exhale) It's just dirty shoes. Let's clean it together.", exp_zh: "透過技巧處理焦慮，體驗「我有能力處理問題」的積極決策。", exp_en: "Using skills builds the 'I can handle problems' positive experience.", options: [{ text: "聚會即將結束 / Gathering ends", next: "act6", change: 0 }] },
+
+        act6: {
+            bg_zh: "背景：聚會結束，大家準備離開。Anxy 需要決定是否要跟剛認識的同學說再見。",
+            bg_en: "Background: The party is over. Anxy needs to decide whether to say goodbye to the new friends.",
+            bgImg: "f_6_scene.png",
+            speaker: "Anxy",
+            text: "「（望著你求助，不知所措地絞著手指……）」",
+            eng: "(Looking at you for help, fidgeting with her fingers...)",
+            options: [
+                { text: "幫她回答，拉著她快速離開。", eng: "Answer for her and pull her away quickly.", next: "check_ending", change: 30 },
+                { text: "鼓勵她：「試著揮揮手說聲再見就好。」", eng: "Encourage: 'Try waving and saying goodbye.'", next: "check_ending", change: -30 }
+            ]
+        }
+    };
+
+    function updateBars() {
+        stats.stress = Math.max(0, Math.min(100, stats.stress));
+        stats.calm = Math.max(0, Math.min(100, stats.calm));
+        document.getElementById('stress-fill').style.width = stats.stress + "%";
+        document.getElementById('stress-val').innerText = stats.stress + "%";
+        document.getElementById('calm-fill').style.width = stats.calm + "%";
+        document.getElementById('calm-val').innerText = stats.calm + "%";
+    }
+
+    function renderScene(key) {
+        if (key === "check_ending") { showEnding(); return; }
+        const scene = scenes[key];
+        if (!scene) return;
+
+        // 更新背景文字 (中英對照)
+        if (scene.bg_zh) {
+            document.getElementById('bg-zh-text').innerText = scene.bg_zh;
+            document.getElementById('bg-en-text').innerText = scene.bg_en;
+            document.getElementById('game-container').style.backgroundImage = `url('${scene.bgImg}')`;
+        }
+
+        document.getElementById('speaker-name').innerText = scene.speaker;
+        let contentHtml = `<div>${scene.text}</div><div class="eng-text">${scene.eng}</div>`;
+        if (scene.exp_zh) {
+            contentHtml += `<div class="explanation">💡 心理筆記 / Psychology Note:<br>${scene.exp_zh}<span class="exp-eng">${scene.exp_en}</span></div>`;
+        }
+        document.getElementById('text-content').innerHTML = contentHtml;
+
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        scene.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerHTML = `${opt.text}<span class="opt-eng">${opt.eng}</span>`;
+            btn.onclick = () => {
+                stats.stress += opt.change;
+                stats.calm -= opt.change;
+                updateBars();
+                renderScene(opt.next);
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    function showEnding() {
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        const speaker = document.getElementById('speaker-name');
+        const text = document.getElementById('text-content');
+        const gameContainer = document.getElementById('game-container'); // 取得背景容器
+
+        if (stats.calm >= stats.stress) {
+            // 好結局設定
+            speaker.innerText = "💖 好結局 / Good Ending";
+            text.innerHTML = "她成功辨識了焦慮觸發因素，自信地露出了微笑。<div class='eng-text'>Emotional Adaptation: Anxy successfully turned social threats into manageable routines!</div>";
+            gameContainer.style.backgroundImage = "url('f_good_scene.png')"; // 設置好結局圖片
+        } else {
+            // 壞結局設定
+            speaker.innerText = "💔 壞結局 / Bad Ending";
+            text.innerHTML = "Anxy 躲進房內不肯出來，她認為虛擬世界比現實安全得多。<div class='eng-text'>Learned Helplessness: Anxy chose total isolation, feeling safer in the virtual world.</div>";
+            gameContainer.style.backgroundImage = "url('f_bad_scene.png')"; // 設置壞結局圖片
+        }
+
+        // 重新挑戰按鈕
+        const btnReset = document.createElement('button');
+        btnReset.className = 'option-btn';
+        btnReset.innerText = "🔄 重新挑戰 / Retry";
+        btnReset.onclick = () => location.reload();
+        container.appendChild(btnReset);
+
+        // 返回首頁按鈕
+        const btnHome = document.createElement('button');
+        btnHome.className = 'option-btn';
+        btnHome.innerText = "🏠 返回首頁 / Home";
+        btnHome.onclick = () => { window.location.href = 'home.html'; };
+        container.appendChild(btnHome);
+    }
+
+    updateBars();
+    renderScene('start');
+</script>
+</body>
+</html>
