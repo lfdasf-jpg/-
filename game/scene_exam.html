@@ -275,14 +275,17 @@
        container.innerHTML = '';
        const speaker = document.getElementById('speaker-name');
        const text = document.getElementById('text-content');
+       const gameContainer = document.getElementById('game-container');
 
 
        if (stats.calm >= stats.stress) {
            speaker.innerText = "💖 好結局 / Good Ending";
            text.innerHTML = "你用陪伴與傾聽幫 Emily 走出低谷，陪她分析試卷、制定小計劃。 Emily 學會了正視挫折。她重新拿起書本，並獲得了勇敢應對困難的自信！<div class='eng-text'>Through your companionship and active listening, you helped Emily navigate her way out of the depths. Together, you analyzed her exam and created a small, manageable plan. Emily learned to face setbacks head-on. She picked up her books once again, empowered with the confidence to bravely tackle any challenge ahead!</div>";
+           gameContainer.style.backgroundImage = "url('f5.png')";
        } else {
            speaker.innerText = "💔 壞結局 / Bad Ending";
            text.innerHTML = "你否定了 Emily 的情緒、催促與指責，她感到努力不被認可。 Emily 封閉了自己，放棄讀書並沉迷於逃避，陷入成績下滑的惡性循環。<div class='eng-text'>By invalidating Emily's emotions with pressure and blame, you made her feel that her efforts were completely unrecognized. Emily shut herself off, gave up on her studies, and retreated into escapism, falling into a vicious cycle of declining grades.</div>";
+           gameContainer.style.backgroundImage = "url('f6.png')";
        }
 
 
