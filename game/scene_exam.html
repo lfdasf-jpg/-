@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+   <meta charset="UTF-8">
+   <title>情緒大冒險 - Emily's Academic Challenge</title>
+   <style>
+       :root {
+           --primary-pink: #ffb7c5;
+           --stress-red: #ff4d4d;
+           --calm-blue: #4db8ff;
+           --text-bg: rgba(255, 255, 255, 0.98);
+       }
+
+
+       body, html { margin: 0; padding: 0; height: 100%; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+
+
+       #game-container {
+           position: relative;
+           width: 100vw; height: 100vh;
+           background-color: #222;
+           background-size: cover;
+           background-position: center;
+           transition: background-image 1s ease-in-out;
+           display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+       }
+
+
+       /* 狀態欄 */
+       #status-bars {
+           position: absolute; top: 20px; right: 20px; width: 280px;
+           background: rgba(0, 0, 0, 0.85); padding: 15px; border-radius: 12px; z-index: 100;
+           border: 1px solid rgba(255,255,255,0.2);
+       }
+       .bar-container { margin-bottom: 10px; }
+       .bar-label { color: white; font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: bold; }
+       .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; }
+       .bar-fill { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+       #stress-fill { background: var(--stress-red); box-shadow: 0 0 8px var(--stress-red); }
+       #calm-fill { background: var(--calm-blue); box-shadow: 0 0 8px var(--calm-blue); }
+
+
+       /* 背景描述標籤 */
+       #bg-info-panel {
+           position: absolute; top: 20px; left: 20px;
+           max-width: 400px; background: rgba(0, 0, 0, 0.7);
+           color: white; padding: 15px; border-radius: 10px;
+           border-left: 5px solid var(--primary-pink); z-index: 100;
+       }
+       .bg-zh { font-size: 14px; font-weight: bold; line-height: 1.4; }
+       .bg-en { font-size: 12px; color: #ccc; margin-top: 5px; font-style: italic; line-height: 1.3; }
+
+
+       #bottom-ui-wrapper {
+           width: 85%; max-width: 1100px; margin-bottom: 40px;
+           display: flex; flex-direction: column; align-items: flex-end; z-index: 10;
+       }
+
+
+       #options-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+
+
+       .option-btn {
+           background: white; border: 2px solid var(--primary-pink); padding: 12px 20px;
+           border-radius: 20px 0px 20px 20px; cursor: pointer; font-size: 1rem;
+           transition: all 0.2s ease; box-shadow: -4px 4px 10px rgba(0,0,0,0.1);
+           text-align: left; min-width: 350px; max-width: 700px;
+       }
+       .option-btn:hover { background: var(--primary-pink); color: white; transform: translateX(-5px); }
+       .opt-eng { display: block; font-size: 0.8rem; opacity: 0.7; margin-top: 2px; }
+
+
+       #dialogue-box {
+           width: 100%; background: var(--text-bg); border: 4px solid var(--primary-pink);
+           border-radius: 20px; padding: 25px; box-sizing: border-box;
+           box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-height: 180px;
+       }
+       #speaker-name { font-weight: bold; color: #d66d75; font-size: 1.25rem; margin-bottom: 10px; border-bottom: 2px solid var(--primary-pink); display: inline-block; }
+       #text-content { font-size: 1.1rem; line-height: 1.6; color: #333; }
+       .eng-text { display: block; font-size: 0.95rem; color: #666; margin-top: 8px; font-style: italic; border-left: 3px solid #eee; padding-left: 10px; }
+
+
+       .explanation { color: #d66d75; font-weight: bold; font-size: 0.95rem; display: block; margin-top: 15px; border-top: 2px dashed #ffb7c5; padding-top: 10px; }
+       .exp-eng { display: block; font-size: 0.85rem; color: #777; font-weight: normal; margin-top: 4px; }
+   </style>
+</head>
+<body>
+
+
+<div id="game-container">
+   <div id="bg-info-panel">
+       <div id="bg-zh-text" class="bg-zh">載入中...</div>
+       <div id="bg-en-text" class="bg-en">Loading...</div>
+   </div>
+
+
+   <div id="status-bars">
+       <div class="bar-container">
+           <div class="bar-label">😰 壓力 Stress <span id="stress-val">50%</span></div>
+           <div class="bar-bg"><div id="stress-fill" class="bar-fill" style="width: 50%;"></div></div>
+       </div>
+       <div class="bar-container">
+           <div class="bar-label">🌿 舒緩 Calm <span id="calm-val">50%</span></div>
+           <div class="bar-bg"><div id="calm-fill" class="bar-fill" style="width: 50%;"></div></div>
+       </div>
+   </div>
+
+
+   <div id="bottom-ui-wrapper">
+       <div id="options-container"></div>
+       <div id="dialogue-box">
+           <div id="speaker-name"></div>
+           <div id="text-content"></div>
+       </div>
+   </div>
+</div>
+
+
+<script>
+   let stats = { stress: 50, calm: 50 };
+
+
+   const scenes = {
+       start: {
+           bg_zh: "背景：收到考卷後的Emily，緊握着不及格的考卷，對自己的成績感到很失落。",
+           bg_en: "Background: After receiving her exam paper, Emily tightly gripped the sheet that had barely passed, feeling disappointed by her results.",
+           bgImg: "f1.png",
+           speaker: "Emily",
+           text: "「我怎麼這麼沒用……努力了這麼久才 40 分，我根本就不是讀書的料。」",
+           eng: "How am I so useless... I worked so hard for so long only to get a 52. I'm just not cut out for studying.",
+           options: [
+               { text: "輕聲坐下：「我知道你很難受，我陪著你，想說就說。」", eng: "Sits down quietly: I know you're going through a hard time. I'm here for you, talk to me whenever you're ready.", next: "q1_a", change: -20 },
+               { text: "皺眉反問：「才 52 分？你平時那麼努力，怎麼考成這樣？」", eng: "Frowns and asks: Only a 52? You worked so hard, how could you end up with a grade like this?", next: "q1_b", change: 20 }
+           ]
+       },
+       q1_a: {
+           speaker: "Emily",
+           text: "「（肩膀垮了下來）我真的覺得好累……好像再怎麼努力都沒有用。」",
+           eng: "(Shoulders slumping) I'm just so tired... It feels like no matter how hard I try, it's all for nothing.",
+           exp_zh: "讓對方感受到被理解，而不是被說教。這是建立心理安全感的第一步。",
+           exp_en: "Make the other person feel understood rather than lectured. This is the first step in establishing psychological safety.",
+           options: [{ text: "繼續關心 / Next", next: "q2", change: 0 }]
+       },
+       q1_b: {
+           speaker: "Emily",
+           text: "「（把考卷揉成一團）是啊，連你都覺得我不該考成這樣……我果然很蠢。」",
+           eng: "(Crumpling her exam paper into a ball) Yeah, even you think I shouldn't have failed like this... I really am stupid, aren't I?",
+           exp_zh: "這會加重對方的自我否定感，關閉溝通的窗口。",
+           exp_en: "This intensifies the individual's sense of self-negation and shuts down the window of communication.",
+           options: [{ text: "繼續對話 / Next", next: "q2", change: 0 }]
+       },
+       q2: {
+           bg_zh: "背景： Emily 的眼眶變紅了，聲音帶著明顯的顫抖，那是積壓了一整個月壓力的爆發。",
+           bg_en: "Background: Emily’s eyes welled up with red, her voice trembling noticeably—it was the explosion of a whole month’s worth of pent-up stress.",
+           bgImg: "f2.png",
+           speaker: "Emily",
+           text: "「我撐不下去，不想讀書了。這一個月我連覺都睡不好，換來的卻是這種分數……」",
+           eng: "I can't keep going. I'm done with school. I haven't even been able to sleep well this past month, and all I get in return is a grade like this...",
+           options: [
+               { text: "遞紙巾拍背：「我懂這種委屈，換我也會崩潰，你已經很厲害了。」", eng: "Hands her a tissue and pats her back: I understand how discouraging this is. I’d break down too if I were you. You’ve actually done a great job.", next: "q2_a", change: -25 },
+               { text: "嘆氣指責：「大家都在努力，就你受不了挫折？別輕易放棄。」", eng: "Sighs and blames her: Everyone is working hard—are you the only one who can't handle a setback? Don't give up so easily.", next: "q2_b", change: 25 }
+           ]
+       },
+       q2_a: {
+           speaker: "Emily",
+           text: "「（接過紙巾抽泣）謝謝你……這一個月我真的壓抑得好辛苦。」",
+           eng: "(Taking the tissue and sobbing) Thank you... I’ve really been struggling to keep it all bottled up this past month.",
+           exp_zh: "認同對方的「委屈」而非僅看見「分數」，能有效降低對方的心理防禦。",
+           exp_en: "Validating their sense of grievance rather than just focusing on the grade can effectively lower their psychological defenses.",
+           options: [{ text: "提出建議 / Next", next: "q3", change: 0 }]
+       },
+       q2_b: {
+           speaker: "Emily",
+           text: "「（沈默不語）算了……，跟你說也沒用。你根本不明白。」",
+           eng: "(Remaining silent) Never mind... There's no point in talking to you. You just don't understand.",
+           exp_zh: "「大家都在努力」是學術焦慮者最怕聽到的一句話，會產生嚴重的道德壓力。",
+           exp_en: "'Everyone is working hard' is the phrase students with academic anxiety dread the most, it creates an overwhelming sense of moral pressure.",
+           options: [{ text: "試著挽救 / Next", next: "q3", change: 0 }]
+       },
+       q3: {
+           bg_zh: "背景： Emily 看著桌上的教科書，眼神中充滿了恐懼與排斥。",
+           bg_en: "Background: Emily stared at the textbooks on her desk, her eyes filled with fear and aversion.",
+           bgImg: "f3.png",
+           speaker: "Emily",
+           text: "「我怕下次還是考不好，沒信心，現在看見這些書就覺得噁心……」",
+           eng: "I'm terrified I'll fail again next time. I’ve lost all my confidence... Just looking at these books makes me feel sick to my stomach now.",
+           options: [
+               { text: "提議放鬆：「我們暫時不看書，我陪你去樓下散散步、吹吹風。」", eng: "Let's put the books away for a while. I'll go for a walk downstairs with you to get some fresh air.", next: "q3_a", change: -25 },
+               { text: "皺眉催促：「信心靠刷題，你現在不看書，下次只會更差。」", eng: "Frowns and urges her: Confidence comes from practice. If you don't study now, your results will only be worse next time.", next: "q3_b", change: 30 }
+           ]
+       },
+       q3_a: {
+           speaker: "Emily",
+           text: "「（深呼吸）好吧，出去走走也好。這裡太悶了。」",
+           eng: "(Taking a deep breath) Alright, maybe going out for a walk is for the best. It’s too suffocating in here.",
+           exp_zh: "當學習環境與「焦慮」產生強連結時，離開當下環境能有效中斷焦慮循環。",
+           exp_en: "When a learning environment becomes strongly linked to anxiety, leaving that setting can effectively interrupt the cycle of distress.",
+           options: [{ text: "散步聊天 / Next", next: "q4", change: 0 }]
+       },
+       q3_b: {
+           speaker: "Emily",
+           text: "「（雙手抱頭）我知道！但我就是看不進去！你別逼我了行嗎？」",
+           eng: "(Holding her head in her hands) I know! But I just can't focus! Can you please stop pushing me?",
+           exp_zh: "焦慮感爆表時，認知能力會下降，強迫對方「現在解決問題」只會導致徹底崩潰。",
+           exp_en: "When anxiety peaks, cognitive abilities decline. Forcing someone to 'solve the problem right now' will only lead to a complete breakdown.",
+           options: [{ text: "進入結局 / Next", next: "q4", change: 0 }]
+       },
+       q4: {
+           bg_zh: "背景：操場路燈下，微風吹過。 Emily 停下腳步，神色凝重地看著你。",
+           bg_en: "Background: Under the playground streetlights, a gentle breeze brushed past. Emily stopped in her tracks and looked at you with a heavy expression.",
+           bgImg: "f4.png",
+           speaker: "Emily",
+           text: "「你說實話，我真的能變好、能考出好成績嗎？我對未來真的很絕望。」",
+           eng: "Tell me the truth... Can I really get better? Can I actually get good grades? I feel so hopeless about the future.",
+           options: [
+               { text: "認真回應：「當然可以，這次只是失誤，我們一起分析試卷，我一直陪著你。」", eng: "Of course you can. This was just a one-time setback. We’ll go over the exam paper together, and I’ll be with you every step of the way.", next: "check_ending", change: -30 },
+               { text: "敷衍回應：「應該可以吧，只要你好好努力，別再偷懶了。」", eng: "Responds perfunctorily: I guess so, as long as you work hard enough and stop being lazy.", next: "check_ending", change: 15 }
+           ]
+       }
+   };
+
+
+   function updateBars() {
+       stats.stress = Math.max(0, Math.min(100, stats.stress));
+       stats.calm = Math.max(0, Math.min(100, stats.calm));
+       document.getElementById('stress-fill').style.width = stats.stress + "%";
+       document.getElementById('stress-val').innerText = stats.stress + "%";
+       document.getElementById('calm-fill').style.width = stats.calm + "%";
+       document.getElementById('calm-val').innerText = stats.calm + "%";
+   }
+
+
+   function renderScene(key) {
+       if (key === "check_ending") { showEnding(); return; }
+       const scene = scenes[key];
+       if (!scene) return;
+
+
+       if (scene.bg_zh) {
+           document.getElementById('bg-zh-text').innerText = scene.bg_zh;
+           document.getElementById('bg-en-text').innerText = scene.bg_en;
+           document.getElementById('game-container').style.backgroundImage = `url('${scene.bgImg}')`;
+       }
+
+
+       document.getElementById('speaker-name').innerText = scene.speaker;
+       let contentHtml = `<div>${scene.text}</div><div class="eng-text">${scene.eng}</div>`;
+       if (scene.exp_zh) {
+           contentHtml += `<div class="explanation">💡 心理筆記 / Psychology Note:<br>${scene.exp_zh}</div>`;
+       }
+       document.getElementById('text-content').innerHTML = contentHtml;
+
+
+       const container = document.getElementById('options-container');
+       container.innerHTML = '';
+
+
+       scene.options.forEach(opt => {
+           const btn = document.createElement('button');
+           btn.className = 'option-btn';
+           btn.innerHTML = `${opt.text}<span class="opt-eng">${opt.eng}</span>`;
+           btn.onclick = () => {
+               stats.stress += opt.change;
+               stats.calm -= opt.change;
+               updateBars();
+               renderScene(opt.next);
+           };
+           container.appendChild(btn);
+       });
+   }
+
+
+   function showEnding() {
+       const container = document.getElementById('options-container');
+       container.innerHTML = '';
+       const speaker = document.getElementById('speaker-name');
+       const text = document.getElementById('text-content');
+
+
+       if (stats.calm >= stats.stress) {
+           speaker.innerText = "💖 好結局 / Good Ending";
+           text.innerHTML = "你用陪伴與傾聽幫 Emily 走出低谷，陪她分析試卷、制定小計劃。 Emily 學會了正視挫折。她重新拿起書本，並獲得了勇敢應對困難的自信！<div class='eng-text'>Through your companionship and active listening, you helped Emily navigate her way out of the depths. Together, you analyzed her exam and created a small, manageable plan. Emily learned to face setbacks head-on. She picked up her books once again, empowered with the confidence to bravely tackle any challenge ahead!</div>";
+       } else {
+           speaker.innerText = "💔 壞結局 / Bad Ending";
+           text.innerHTML = "你否定了 Emily 的情緒、催促與指責，她感到努力不被認可。 Emily 封閉了自己，放棄讀書並沉迷於逃避，陷入成績下滑的惡性循環。<div class='eng-text'>By invalidating Emily's emotions with pressure and blame, you made her feel that her efforts were completely unrecognized. Emily shut herself off, gave up on her studies, and retreated into escapism, falling into a vicious cycle of declining grades.</div>";
+       }
+
+
+       const btnReset = document.createElement('button');
+       btnReset.className = 'option-btn';
+       btnReset.innerText = "🔄 重新挑戰 / Retry";
+       btnReset.onclick = () => location.reload();
+       container.appendChild(btnReset);
+
+
+       const btnHome = document.createElement('button');
+       btnHome.className = 'option-btn';
+       btnHome.innerText = "🏠 返回首頁 / Home";
+       btnHome.onclick = () => { window.location.href = 'home.html'; };
+       container.appendChild(btnHome);
+   }
+
+
+   updateBars();
+   renderScene('start');
+</script>
+</body>
+</html>
