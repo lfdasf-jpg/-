@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>情緒大冒險 - 未來焦慮挑戰</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+            overflow: hidden;
+            background: #2c1e2f;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-size: cover;
+            background-position: center 30%;
+            background-repeat: no-repeat;
+            transition: background-image 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        /* 全屏角色立繪（類似背景層） */
+        #character-portrait {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+        }
+
+        /* 對話框區域，高於立繪 */
+        .dialogue-wrapper {
+            position: relative;
+            z-index: 20;
+            width: 90%;
+            max-width: 1100px;
+            margin-bottom: 40px;
+        }
+
+        #scene-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 24px;
+            border-left: 5px solid #ffb7c5;
+            max-width: 320px;
+            font-size: 0.85rem;
+            z-index: 30;
+            pointer-events: none;
+            font-weight: 500;
+        }
+        #scene-info .scene-zh { font-size: 1rem; margin-bottom: 4px; }
+        #scene-info .scene-en { font-size: 0.75rem; opacity: 0.8; font-style: italic; }
+
+        #stats-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+            padding: 12px 20px;
+            width: 260px;
+            z-index: 30;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .stat-item {
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #eee;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .stat-bar {
+            width: 100%;
+            height: 8px;
+            background: #3a2c3f;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .stat-fill {
+            height: 100%;
+            width: 50%;
+            transition: width 0.3s ease;
+        }
+        #stress-fill { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+        #calm-fill { background: #6bc9ff; box-shadow: 0 0 6px #6bc9ff; }
+
+        #dialogue-box {
+            background: rgba(255,255,255,0.97);
+            border-radius: 28px;
+            border: 2px solid #ffb7c5;
+            padding: 24px 28px;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.3);
+        }
+
+        #speaker {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #d66d75;
+            margin-bottom: 12px;
+            border-left: 4px solid #ffb7c5;
+            padding-left: 15px;
+        }
+
+        #dialogue-text {
+            font-size: 1.15rem;
+            line-height: 1.55;
+            color: #2d1b2e;
+            min-height: 90px;
+        }
+
+        .dialogue-en {
+            display: block;
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 6px;
+            font-style: italic;
+            border-left: 2px solid #ffb7c5;
+            padding-left: 10px;
+        }
+
+        .psych-note {
+            margin-top: 18px;
+            padding-top: 12px;
+            border-top: 2px dashed #ffb7c5;
+            color: #b34e5a;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .psych-note-en {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: normal;
+            color: #b34e5a;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        #options-area {
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option-btn, .continue-btn {
+            background: white;
+            border: 2px solid #ffb7c5;
+            padding: 12px 18px;
+            border-radius: 32px;
+            font-size: 1rem;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: -2px 3px 8px rgba(0,0,0,0.08);
+            width: 100%;
+        }
+        .option-btn:hover, .continue-btn:hover {
+            background: #ffb7c5;
+            color: white;
+            transform: translateX(-5px);
+        }
+        .continue-btn {
+            background: #6bc9ff;
+            border-color: #3aa0e0;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+        }
+        .continue-btn:hover {
+            background: #3aa0e0;
+            transform: scale(1.02);
+        }
+
+        /* 壓力變化浮動提示 */
+        .stat-toast {
+            position: fixed;
+            bottom: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #ffb7c5;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            z-index: 200;
+            pointer-events: none;
+            animation: fadeOut 1.5s forwards;
+            white-space: nowrap;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            70% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); visibility: hidden; }
+        }
+
+        @media (max-width: 800px) {
+            .dialogue-wrapper { width: 95%; }
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+    <div id="scene-info">
+        <div id="scene-zh" class="scene-zh">背景：大學畢業禮堂</div>
+        <div id="scene-en" class="scene-en">Background: Graduation Hall</div>
+    </div>
+    <div id="stats-panel">
+        <div class="stat-item">
+            <div class="stat-label">😰 壓力 Stress <span id="stress-val">50%</span></div>
+            <div class="stat-bar"><div id="stress-fill" class="stat-fill" style="width: 50%;"></div></div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">🌿 舒緩 Calm <span id="calm-val">50%</span></div>
+            <div class="stat-bar"><div id="calm-fill" class="stat-fill" style="width: 50%;"></div></div>
+        </div>
+    </div>
+
+    <div id="character-portrait"></div>
+
+    <div class="dialogue-wrapper">
+        <div id="dialogue-box">
+            <div id="speaker">白梓</div>
+            <div id="dialogue-text">載入中...</div>
+            <div id="options-area"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- 遊戲狀態 ----------
+    let stats = {
+        stress: 50,
+        calm: 50
+    };
+    let currentSceneId = "start";
+    let currentDialogues = [];
+    let dialogueIndex = 0;
+    let pendingNextScene = null;
+    let pendingPsychNote = null;
+    let pendingPsychNoteEn = null;
+    let nonsenseCount = 0;
+
+    // ========== 音效映射 ==========
+    function getMp3FromText(text) {
+        let defaultFile = "click.mp3";
+        if (text.includes("手機鈴聲") || text.includes("噔⬈噔")) return "ring.mp3";
+        if (text.includes("咕咕嘎嘎?")) return "gu1.mp3";
+        if (text.includes("咕咕嘎嘎！")) return "gu.mp3";
+        if (text.includes("晚安")) return "goodnight.mp3";
+        if (text.includes("哈基米喔南北綠豆")) return "song.mp3";
+        if (text.includes("阿西嘎")) return "sigh.mp3";
+        return defaultFile;
+    }
+
+    function playMp3ByText(text) {
+        try {
+            let file = getMp3FromText(text);
+            let audio = new Audio(file);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log("音效播放失敗:", e));
+        } catch(e) { console.log("音效支援錯誤"); }
+    }
+
+    // 顯示壓力/舒緩變化浮動提示
+    function showStatChange(deltaStress, deltaCalm) {
+        let msg = "";
+        if (deltaStress !== 0) msg += `壓力 ${deltaStress > 0 ? "+" : ""}${deltaStress}  `;
+        if (deltaCalm !== 0) msg += `舒緩 ${deltaCalm > 0 ? "+" : ""}${deltaCalm}`;
+        if (msg === "") return;
+        const toast = document.createElement("div");
+        toast.className = "stat-toast";
+        toast.innerText = msg.trim();
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 1500);
+    }
+
+    function updateUI() {
+        document.getElementById('stress-fill').style.width = Math.min(100, Math.max(0, stats.stress)) + "%";
+        document.getElementById('stress-val').innerText = stats.stress + "%";
+        document.getElementById('calm-fill').style.width = Math.min(100, Math.max(0, stats.calm)) + "%";
+        document.getElementById('calm-val').innerText = stats.calm + "%";
+    }
+
+    function addChange(stressDelta, calmDelta) {
+        if (stressDelta !== undefined) {
+            stats.stress += stressDelta;
+            stats.calm += calmDelta;
+            updateUI();
+            showStatChange(stressDelta, calmDelta);
+        }
+    }
+
+    // 處理對話文本：移除角色圖標記、播放音效、提取立繪文件名、提取背景圖標記
+    function processDialogueLine(text, speaker) {
+        let cleanText = text;
+        let portraitFile = null;
+        let bgFile = null;
+
+        // 提取 (FUPx) 或 （FUPx） 標記（立繪）
+        const fupMatch = cleanText.match(/[（(]FUP(\d+)(?:\.(\w+))?[）)]/);
+        if (fupMatch) {
+            let ext = fupMatch[2] ? `.${fupMatch[2]}` : ".png";
+            portraitFile = `FUP${fupMatch[1]}${ext}`;
+            cleanText = cleanText.replace(/[（(]FUP\d+(?:\.\w+)?[）)]/g, "").trim();
+        }
+
+        // 提取 (FUx) 或 （FUx） 標記（背景）
+        const fuMatch = cleanText.match(/[（(]FU(\d+)(?:\.(\w+))?[）)]/);
+        if (fuMatch) {
+            let ext = fuMatch[2] ? `.${fuMatch[2]}` : ".png";
+            bgFile = `FU${fuMatch[1]}${ext}`;
+            cleanText = cleanText.replace(/[（(]FU\d+(?:\.\w+)?[）)]/g, "").trim();
+        }
+
+        // 處理音效
+        if (cleanText.includes("（play mp3）") || cleanText.includes("(play mp3)")) {
+            playMp3ByText(cleanText);
+            cleanText = cleanText.replace(/[（(]play mp3[）)]/g, "").trim();
+        }
+
+        // 移除其他可能的角色圖舊標記（如（白梓圖））
+        cleanText = cleanText.replace(/（[^）]*圖）|\([^)]*圖\)/g, "").trim();
+
+        return { cleanText, portraitFile, bgFile };
+    }
+
+    // 設置全屏立繪（有圖片則顯示，否則隱藏）
+    function setCharacterPortrait(portraitFile) {
+        const portraitDiv = document.getElementById('character-portrait');
+        if (portraitFile && portraitFile.trim() !== "") {
+            portraitDiv.style.backgroundImage = `url('${portraitFile}')`;
+            portraitDiv.style.display = "block";
+        } else {
+            portraitDiv.style.backgroundImage = "none";
+            portraitDiv.style.display = "none";
+        }
+    }
+
+    // 設置遊戲背景
+    function setBackground(bgFile) {
+        if (bgFile && bgFile.trim() !== "") {
+            document.getElementById('game-container').style.backgroundImage = `url('${bgFile}')`;
+        }
+    }
+
+    // ---------- 場景資料庫（中英對照）----------
+    const scenes = {
+        start: {
+            bgZh: "背景：大學畢業禮堂，大家正準備拍畢業照。",
+            bgEn: "Background: Graduation ceremony, everyone is taking photos.",
+            bgImg: "FU1.png",
+            dialogues: [
+                { speaker: "旁白", text: "今天是你大學四年的畢業禮，你約了你的青梅竹馬白梓拍張照", textEn: "Today is your university graduation ceremony. You've arranged to take a photo with your childhood friend Bai Zi." },
+                { speaker: "白梓", text: "嗨！原來你在這裡！和我一起拍個照吧，畢竟我們那麼多年的交情嘛！(FUP1)", textEn: "Hi! So you're here! Let's take a photo together—after all, we've known each other for so many years! (FUP1)" },
+                { speaker: "你", text: "對啊，被你freeride那麼多年的交情呢（笑）", textEn: "Yeah, after you've been freeriding off our friendship for so many years (laughs)" },
+                { speaker: "白梓", text: "哎呀，不要在意這些細節（咔嚓），對了，你之後有什麼打算？", textEn: "Oh, don't mind the details (click). So, what are your plans after this?" },
+                { speaker: "白梓", text: "我聽阿甲阿乙和阿丙他們都想好之後要做什麼了。", textEn: "I heard A-Jia, A-Yi, and A-Bing all have plans." },
+                { speaker: "白梓", text: "阿甲打算進修讀碩士，阿乙已經有大公司offer了，阿丙則是被富婆看上被包養了。", textEn: "A-Jia is going to pursue a master's degree, A-Yi already has an offer from a big company, and A-Bing was taken in by a wealthy woman." },
+                { speaker: "白梓", text: "真是可惡啊，我也想被富婆包養呢。", textEn: "How annoying! I'd like to be taken in by a wealthy woman too." },
+                { speaker: "白梓", text: "我還什麼都還沒想過呢，這就畢業了，大學我還沒玩夠呢。", textEn: "I haven't even thought about anything yet, and now I'm already graduating. I haven't had enough of university life." }
+            ],
+            options: [
+                { text: "我早就開始準備了，現在offer也拿到了。", stressDelta: 17, calmDelta: -17, branch: "branch_offer" },
+                { text: "我也還沒想過呢，現在再想也不晚", stressDelta: -17, calmDelta: 17, branch: "branch_same" },
+                { text: "What the dog doing", stressDelta: -2, calmDelta: 2, branch: "branch_dog" }
+            ]
+        },
+        branch_offer: {
+            dialogues: [
+                { speaker: "白梓", text: "怎麼你也準備好了，原來就我一個什麼都沒準備嗎！", textEn: "You've already prepared too? So I'm the only one who hasn't prepared anything!" },
+                { speaker: "白梓", text: "這下可怎麼辦，現在開始想還來不來得及啊。", textEn: "What should I do now? Is it too late to start thinking?" }
+            ],
+            nextScene: "scene2",
+            psychNote: "這是社會比較理論（Social Comparison Theory）的典型表現。白梓進行向上比較後，強烈感受到自己落後，產生未來焦慮。",
+            psychNoteEn: "This is a classic example of Social Comparison Theory. After upward comparison, Bai Zi feels strongly left behind, generating future anxiety."
+        },
+        branch_same: {
+            dialogues: [
+                { speaker: "白梓", text: "我就知道我不是一個人！不管了，事已至此，先啟動吧！", textEn: "I knew I wasn't the only one! Never mind, let's just go with the flow for now!" },
+                { speaker: "旁白", text: "你和白梓就暫時把問題拋諸腦後，玩起了遊戲。", textEn: "You and Bai Zi temporarily put aside your worries and start playing games." }
+            ],
+            nextScene: "scene2",
+            psychNote: "你選擇與白梓建立共同處境認同（向下比較），短暫緩解了她的壓力。",
+            psychNoteEn: "You choose to share a common situation with Bai Zi (downward comparison), temporarily relieving her stress."
+        },
+        branch_dog: {
+            dialogues: [
+                { speaker: "白梓", text: "BiBiLaBu （廢話）", textEn: "BiBiLaBu (nonsense)" }
+            ],
+            nextScene: "scene2",
+            psychNote: "使用荒謔回應進行情緒轉移，類似社會學習理論中的輕鬆模仿行為。",
+            psychNoteEn: "Using absurd responses for emotional diversion, similar to light-hearted modeling in Social Learning Theory."
+        },
+
+        scene2: {
+            bgZh: "背景：一個月後的朋友聚會，卡拉OK包廂。",
+            bgEn: "Background: One month later, karaoke party with friends.",
+            bgImg: "FU2.jpg",
+            dialogues: [
+                { speaker: "旁白", text: "一個月後。", textEn: "One month later." },
+                { speaker: "旁白", text: "你和你的老朋友們每隔一段時間就會相約聚會一次，白梓也是其中一員。", textEn: "You and your old friends meet up regularly, and Bai Zi is one of them." },
+                { speaker: "旁白", text: "現在你們在唱卡拉ok。", textEn: "Now you're singing karaoke." },
+                { speaker: "白梓", text: "哈基米喔南北綠豆♪（play mp3）(FUP2)", textEn: "Hakimi oh nanbei green bean♪ (play mp3) (FUP2)" },
+                { speaker: "白梓", text: "阿西嘎...唉（play mp3）", textEn: "Ah... sigh (play mp3)" }
+            ],
+            options: [
+                { text: "你怎麼了，怎麼唉聲歎氣的。", next: "q2_main", stressDelta: 0, calmDelta: 0, isSingle: true }
+            ]
+        },
+        q2_main: {
+            dialogues: [
+                { speaker: "白梓", text: "自從畢業之後，我就開始找工作了。", textEn: "After graduation, I started looking for jobs." },
+                { speaker: "白梓", text: "但我到處投了很多的簡歷，居然一點音訊也沒有。", textEn: "But I sent out so many resumes and haven't heard anything back." },
+                { speaker: "白梓", text: "甚至就連快餐店都不要我，我起碼也是個大學生欸。", textEn: "Even fast food places don't want me. I'm at least a university graduate!" },
+                { speaker: "白梓", text: "前路真是一片黑暗啊", textEn: "The road ahead is so dark..." }
+            ],
+            options: [
+                { text: "笑死，想不到就連快餐店也不要你。", stressDelta: 17, calmDelta: -17, branch: "branch_ridicule" },
+                { text: "你一個大學生怎麼可能快餐店都不請，是不是有哪裡搞錯了。", stressDelta: 17, calmDelta: -17, branch: "branch_doubt" },
+                { text: "不用想那麼多，急也沒用，今天就專心玩，這些事情之後再想吧。", stressDelta: -17, calmDelta: 17, branch: "branch_distract" },
+                { text: "你說得對，但你說得對。", stressDelta: -2, calmDelta: 2, branch: "branch_nonsense2" }
+            ]
+        },
+        branch_ridicule: {
+            dialogues: [
+                { speaker: "旁白", text: "白梓露出一個尷尬且不失禮貌的笑容並拒絕作出回應。（自卑）（焦慮）", textEn: "Bai Zi shows an awkward but polite smile and refuses to respond. (Inferiority) (Anxiety)" }
+            ],
+            nextScene: "scene3",
+            psychNote: "嘲諷式回應強化了白梓的向上社會比較與自卑感。",
+            psychNoteEn: "Sarcastic response strengthens Bai Zi's upward social comparison and feelings of inferiority."
+        },
+        branch_doubt: {
+            dialogues: [
+                { speaker: "白梓", text: "我應該沒搞錯什麼啊，沒搞錯吧...（自我懷疑）", textEn: "I didn't make any mistake, did I...? (Self-doubt)" }
+            ],
+            nextScene: "scene3",
+            psychNote: "質疑引發白梓的自我懷疑循環，加劇未來焦慮。",
+            psychNoteEn: "Questioning triggers Bai Zi's self-doubt loop, worsening her future anxiety."
+        },
+        branch_distract: {
+            dialogues: [
+                { speaker: "白梓", text: "你說得對，現在光焦慮也沒什麼用。", textEn: "You're right. Worrying won't help right now." },
+                { speaker: "白梓", text: "今天那麼難得約大家出來，必須玩個盡興！", textEn: "We rarely get together like this, so let's have fun!" }
+            ],
+            nextScene: "scene3",
+            psychNote: "引導白梓轉向當下正面體驗，符合社會情感選擇理論。",
+            psychNoteEn: "Guiding Bai Zi to focus on the present positive experience aligns with Socioemotional Selectivity Theory."
+        },
+        branch_nonsense2: {
+            dialogues: [
+                { speaker: "白梓", text: "對...對嗎？對哪了？（廢話）", textEn: "Right... right about what? (Nonsense)" }
+            ],
+            nextScene: "scene3",
+            psychNote: "廢話式回應提供短暫情緒緩衝。",
+            psychNoteEn: "Nonsensical response provides a brief emotional buffer."
+        },
+        scene2_tail: {
+            dialogues: [
+                { speaker: "旁白", text: "聚會自然的繼續下去，你們都玩的很開心。", textEn: "The party continues naturally, and everyone has a good time." },
+                { speaker: "旁白", text: "但你始終感覺白梓有種不自然的感覺。", textEn: "But you always feel that Bai Zi seems a bit unnatural." }
+            ],
+            nextScene: "scene3"
+        },
+
+        scene3: {
+            bgZh: "背景：深夜2點的臥室，天花板。",
+            bgEn: "Background: 2 AM bedroom, ceiling.",
+            bgImg: "FU3.avif",
+            dialogues: [
+                { speaker: "旁白", text: "噔⬈噔⮕噔⮕噔⬊噔⬊噔⮕噔⮕噔⬊ 。(手機鈴聲)（play mp3）", textEn: "Ring ring ring ring... (Phone ringing) (play mp3)" },
+                { speaker: "旁白", text: "Your phone linging, your phone linging。（play mp3）", textEn: "Your phone linging, your phone linging. (play mp3)" },
+                { speaker: "旁白", text: "Big boy, come pick up your phone。（play mp3）", textEn: "Big boy, come pick up your phone. (play mp3)" },
+                { speaker: "旁白", text: "快要睡著的你煩躁地拿起手機。", textEn: "Half-asleep, you irritably pick up your phone." },
+                { speaker: "旁白", text: "原來是白梓的訊息和電話。", textEn: "It's messages and calls from Bai Zi." },
+                { speaker: "白梓", text: "丟的簡歷終於有一家有回復了！(FUP3)", textEn: "One of the resumes I sent finally got a reply! (FUP3)" },
+                { speaker: "白梓", text: "可是他們居然讓我明天就去面試！", textEn: "But they want me to go for an interview tomorrow!" },
+                { speaker: "白梓", text: "我還什麼都沒準備過呢！", textEn: "I haven't prepared anything at all!" },
+                { speaker: "白梓", text: "怎麼辦怎麼辦！", textEn: "What should I do? What should I do?!" },
+                { speaker: "白梓", text: "語音通話", textEn: "Voice call" }
+            ],
+            options: [
+                { text: "默默的把手機調成勿擾，繼續睡覺。", stressDelta: 17, calmDelta: -17, branch: "branch_ignore" },
+                { text: "起床幫助她準備面試。", stressDelta: -17, calmDelta: 17, branch: "branch_help" },
+                { text: "加油，一個晚上一個奇跡。", stressDelta: -2, calmDelta: 2, branch: "branch_cheer" }
+            ]
+        },
+        branch_ignore: {
+            dialogues: [
+                { speaker: "旁白", text: "你無視了白梓的求助，並回到舒服的被窩。", textEn: "You ignore Bai Zi's plea and return to your comfortable bed." },
+                { speaker: "旁白", text: "但對白梓來說，今晚註定是個孤單奮戰的不眠之夜。", textEn: "But for Bai Zi, tonight is destined to be a sleepless night of fighting alone." },
+                { speaker: "旁白", text: "不過這和你又有什麼關係呢。", textEn: "But what does that have to do with you?" },
+                { speaker: "旁白", text: "晚安，瑪卡巴卡。（play mp3）", textEn: "Good night, Makka Pakka. (play mp3)" }
+            ],
+            nextScene: "scene4",
+            psychNote: "拒絕提供支持，錯失強連結的情感緩衝機會。",
+            psychNoteEn: "Refusing to provide support misses the emotional buffering opportunity of a strong tie."
+        },
+        branch_help: {
+            dialogues: [
+                { speaker: "旁白", text: "你決定一場朋友，就幫幫她吧。", textEn: "You decide to help her out as a friend." },
+                { speaker: "旁白", text: "你和白梓忙活了一整晚。", textEn: "You and Bai Zi work through the whole night." },
+                { speaker: "旁白", text: "包含但不至於找參考資料，做角色扮演，還有事後復盤。", textEn: "Including but not limited to finding reference materials, role-playing, and debriefing afterward." },
+                { speaker: "旁白", text: "經過這一晚，你和白梓都長大了。", textEn: "After this night, both you and Bai Zi have grown up." },
+                { speaker: "旁白", text: "現在的你們是真正的面試大師。", textEn: "Now you're true interview masters." }
+            ],
+            nextScene: "scene4",
+            psychNote: "這是社會學習理論的良好示範。你作為正面榜樣幫助白梓成長。",
+            psychNoteEn: "This is a good example of Social Learning Theory. You act as a positive role model to help Bai Zi grow."
+        },
+        branch_cheer: {
+            dialogues: [
+                { speaker: "旁白", text: "睡夢中的你被吵醒。", textEn: "You're woken up from sleep." },
+                { speaker: "旁白", text: "阻人睡覺如同殺人父母，被吵醒的你並不想管她。", textEn: "Disturbing someone's sleep is like killing their parents. You don't want to deal with her." },
+                { speaker: "旁白", text: "但出於禮貌和友情，你用梗簡單回復她就繼續睡覺了。", textEn: "But out of politeness and friendship, you reply with a meme and go back to sleep." },
+                { speaker: "旁白", text: "白梓看完氣笑了，但她也自知深夜找人理虧。", textEn: "Bai Zi laughs in frustration after reading it, but she knows she's in the wrong for calling so late." },
+                { speaker: "旁白", text: "不過你的回復也給她帶來了些許喘息空間。", textEn: "Still, your reply gives her a little breathing space." }
+            ],
+            nextScene: "scene4",
+            psychNote: "簡短的支持提供少量喘息空間，但幫助有限。",
+            psychNoteEn: "Brief support provides a small amount of breathing space, but the help is limited."
+        },
+
+        scene4: {
+            bgZh: "背景：白梓家客廳，早晨早餐。",
+            bgEn: "Background: Bai Zi's living room, breakfast time.",
+            bgImg: "FU4.jpg",
+            dialogues: [
+                { speaker: "旁白", text: "你和白梓習慣每天早上都一起放鬆地吃早餐。", textEn: "You and Bai Zi have a habit of having a relaxed breakfast together every morning." },
+                { speaker: "旁白", text: "但今天的早餐相比起平常。", textEn: "But today's breakfast, compared to usual..." },
+                { speaker: "旁白", text: "卻是一點都不放鬆。", textEn: "...is anything but relaxing." },
+                { speaker: "白梓", text: "等下吃完早餐就要去面試了，我好緊張！(FUP4)", textEn: "I have to go for the interview after breakfast. I'm so nervous! (FUP4)" },
+                { speaker: "白梓", text: "我的心跳得好快，我甚至感覺有點頭暈了。", textEn: "My heart is pounding so fast, I even feel a little dizzy." },
+                { speaker: "白梓", text: "我該不能是這個時候病了吧！", textEn: "I can't be getting sick right now, can I?!" },
+                { speaker: "白梓", text: "胃也有點不舒服。", textEn: "My stomach also feels a bit uncomfortable." },
+                { speaker: "白梓", text: "這樣的身體情況，我等下面試要怎麼辦呀。", textEn: "In this physical state, how am I supposed to handle the interview?" }
+            ],
+            options: [
+                { text: "你看你又急。", stressDelta: 17, calmDelta: -17, branch: "end_branch1" },
+                { text: "沒事，這很正常的，習慣了面試就不會了。", stressDelta: 17, calmDelta: -17, branch: "end_branch2" },
+                { text: "我也試過面試前這樣，很正常的，我也有方法解決。", stressDelta: -17, calmDelta: 17, branch: "end_branch3" },
+                { text: "來跟我唸，咕咕嘎嘎！", stressDelta: -2, calmDelta: 2, branch: "end_branch4" }
+            ]
+        },
+        end_branch1: {
+            dialogues: [
+                { speaker: "白梓", text: "我是真的真的很不舒服。", textEn: "I'm really, really uncomfortable." },
+                { speaker: "白梓", text: "你別拿我的痛苦玩梗。", textEn: "Don't joke about my suffering." },
+                { speaker: "白梓", text: "我覺得一點也不好笑。", textEn: "I don't find it funny at all." },
+                { speaker: "旁白", text: "你和白梓平時都喜歡在聊天時用上網絡謎因。", textEn: "You and Bai Zi usually enjoy using internet memes in your chats." },
+                { speaker: "旁白", text: "但看來不合時宜的網絡謎因對聊天造成了反效果。", textEn: "But it seems an ill-timed meme backfired." }
+            ],
+            nextScene: "check_ending",
+            psychNote: "輕視對方的感受，讓白梓感覺不被理解。",
+            psychNoteEn: "Dismissing her feelings makes Bai Zi feel misunderstood."
+        },
+        end_branch2: {
+            dialogues: [
+                { speaker: "白梓", text: "這，這種感覺是正常的嗎？", textEn: "Is this feeling normal?" },
+                { speaker: "白梓", text: "習慣了面試就不會了，但我還沒習慣面試啊？", textEn: "I won't feel this way once I'm used to interviews, but I'm not used to them yet!" },
+                { speaker: "白梓", text: "也就是說我只能受著這種不舒服去面試嗎？", textEn: "So I just have to endure this discomfort for the interview?" },
+                { speaker: "白梓", text: "我好想吐，嗚嗚。", textEn: "I feel like throwing up, wuwu." }
+            ],
+            nextScene: "check_ending",
+            psychNote: "僅正常化焦慮卻未提供解決方法，容易產生無力感。",
+            psychNoteEn: "Merely normalizing anxiety without providing solutions easily leads to feelings of helplessness."
+        },
+        end_branch3: {
+            dialogues: [
+                { speaker: "白梓", text: "有方法解決，什麼方法？", textEn: "There's a method? What is it?" },
+                { speaker: "你", text: "做幾次深呼吸。", textEn: "Take a few deep breaths." },
+                { speaker: "白梓", text: "深呼吸能解決？真的假的。", textEn: "Deep breathing can solve this? Really?" },
+                { speaker: "你", text: "這可是特別的深呼吸法，來跟著我做，深吸一口氣。", textEn: "This is a special deep breathing technique. Follow me: take a deep breath in." },
+                { speaker: "白梓", text: "吸~。", textEn: "Inhale~." },
+                { speaker: "你", text: "閉氣7秒。", textEn: "Hold for 7 seconds." },
+                { speaker: "白梓", text: "嗯嗯。", textEn: "Mmm-hmm." },
+                { speaker: "你", text: "用4秒把氣全呼掉。", textEn: "Exhale completely over 4 seconds." },
+                { speaker: "白梓", text: "呼~。", textEn: "Exhale~." },
+                { speaker: "白梓", text: "真的有效欸！特別在閉氣的時候。", textEn: "It really works! Especially when holding my breath." },
+                { speaker: "白梓", text: "我能特別明顯地感覺到我的心跳，和它漸漸緩下來的感覺！", textEn: "I can clearly feel my heartbeat slowing down!" },
+                { speaker: "白梓", text: "現在我感覺好多了！", textEn: "I feel much better now!" }
+            ],
+            nextScene: "check_ending",
+            psychNote: "教導具體深呼吸技巧，有效中斷焦慮循環。",
+            psychNoteEn: "Teaching concrete deep breathing techniques effectively interrupts the anxiety cycle."
+        },
+        end_branch4: {
+            dialogues: [
+                { speaker: "白梓", text: "？？？", textEn: "??? What?" },
+                { speaker: "白梓", text: "啊？", textEn: "Huh?" },
+                { speaker: "你", text: "喊就對了，咕咕嘎嘎！", textEn: "Just shout it: Gu Gu Ga Ga!" },
+                { speaker: "白梓", text: "...咕咕嘎嘎?（play mp3）", textEn: "...Gu Gu Ga Ga? (play mp3)" },
+                { speaker: "你", text: "咕咕嘎嘎！", textEn: "Gu Gu Ga Ga!" },
+                { speaker: "白梓", text: "咕咕嘎嘎！（play mp3）", textEn: "Gu Gu Ga Ga! (play mp3)" },
+                { speaker: "你", text: "咕咕嘎嘎！", textEn: "Gu Gu Ga Ga!" },
+                { speaker: "白梓", text: "咕咕嘎嘎！！", textEn: "Gu Gu Ga Ga! (play mp3)" },
+                { speaker: "旁白", text: "你們的瞎叫成功吵醒了鄰居，並被罵了一頓。", textEn: "Your foolish shouting wakes up the neighbors, and you get scolded." },
+                { speaker: "旁白", text: "不過因為這段插曲。", textEn: "But because of this episode..." },
+                { speaker: "旁白", text: "白梓的注意力沒有再放在身體不適上了。", textEn: "Bai Zi's attention is no longer focused on her physical discomfort." }
+            ],
+            nextScene: "check_ending",
+            psychNote: "用幽默轉移注意力，暫時緩解身體不適。",
+            psychNoteEn: "Using humor to divert attention temporarily relieves physical discomfort."
+        },
+
+        check_ending: { final: true }
+    };
+
+    // ---------- 流程控制 ----------
+    function advanceDialogue() {
+        const optArea = document.getElementById('options-area');
+        if (dialogueIndex < currentDialogues.length) {
+            const line = currentDialogues[dialogueIndex];
+            const { cleanText, portraitFile, bgFile } = processDialogueLine(line.text, line.speaker);
+            const textEn = line.textEn || "";
+            let displayHtml = cleanText;
+            if (textEn) displayHtml += `<div class="dialogue-en">${textEn}</div>`;
+            document.getElementById('speaker').innerText = line.speaker;
+            document.getElementById('dialogue-text').innerHTML = displayHtml;
+            if (portraitFile) setCharacterPortrait(portraitFile);
+            if (bgFile) setBackground(bgFile);
+            dialogueIndex++;
+            return;
+        }
+        if (pendingPsychNote) {
+            let noteHtml = `<div class="psych-note">${pendingPsychNote}`;
+            if (pendingPsychNoteEn) noteHtml += `<div class="psych-note-en">${pendingPsychNoteEn}</div>`;
+            noteHtml += `</div>`;
+            document.getElementById('dialogue-text').innerHTML += noteHtml;
+            pendingPsychNote = null;
+            pendingPsychNoteEn = null;
+        }
+        optArea.innerHTML = '';
+        const contBtn = document.createElement('button');
+        contBtn.className = 'continue-btn';
+        contBtn.innerText = '繼續 →';
+        contBtn.onclick = () => {
+            if (pendingNextScene === "check_ending") {
+                showEnding();
+            } else {
+                loadScene(pendingNextScene);
+            }
+        };
+        optArea.appendChild(contBtn);
+    }
+
+    function loadScene(sceneId) {
+        const scene = scenes[sceneId];
+        if (!scene) return;
+        document.getElementById('scene-zh').innerText = scene.bgZh || "背景";
+        document.getElementById('scene-en').innerText = scene.bgEn || "";
+        if (scene.bgImg) {
+            setBackground(scene.bgImg);
+        }
+
+        currentDialogues = scene.dialogues ? [...scene.dialogues] : [];
+        dialogueIndex = 0;
+        pendingNextScene = null;
+        pendingPsychNote = null;
+        pendingPsychNoteEn = null;
+
+        // 提取場景第一句的立繪標記
+        let firstPortrait = null;
+        if (currentDialogues.length > 0) {
+            const firstText = currentDialogues[0].text;
+            const fupMatch = firstText.match(/[（(]FUP(\d+)(?:\.(\w+))?[）)]/);
+            if (fupMatch) {
+                let ext = fupMatch[2] ? `.${fupMatch[2]}` : ".png";
+                firstPortrait = `FUP${fupMatch[1]}${ext}`;
+            }
+        }
+
+        // 判斷是否為主場景（有背景圖）
+        const isMainScene = !!scene.bgImg;
+        if (isMainScene) {
+            setCharacterPortrait(firstPortrait);
+        } else {
+            if (firstPortrait) {
+                setCharacterPortrait(firstPortrait);
+            }
+        }
+
+        // 顯示第一句對話
+        if (currentDialogues.length > 0) {
+            const first = currentDialogues[0];
+            const { cleanText, portraitFile, bgFile } = processDialogueLine(first.text, first.speaker);
+            const textEn = first.textEn || "";
+            let displayHtml = cleanText;
+            if (textEn) displayHtml += `<div class="dialogue-en">${textEn}</div>`;
+            document.getElementById('speaker').innerText = first.speaker;
+            document.getElementById('dialogue-text').innerHTML = displayHtml;
+            if (portraitFile) setCharacterPortrait(portraitFile);
+            if (bgFile) setBackground(bgFile);
+            dialogueIndex = 1;
+        } else {
+            document.getElementById('dialogue-text').innerHTML = "（沒有對話）";
+        }
+
+        const optArea = document.getElementById('options-area');
+        optArea.innerHTML = '';
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'continue-btn';
+        nextBtn.innerText = '繼續 →';
+        nextBtn.onclick = () => {
+            if (dialogueIndex < currentDialogues.length) {
+                const line = currentDialogues[dialogueIndex];
+                const { cleanText, portraitFile, bgFile } = processDialogueLine(line.text, line.speaker);
+                const textEn = line.textEn || "";
+                let displayHtml = cleanText;
+                if (textEn) displayHtml += `<div class="dialogue-en">${textEn}</div>`;
+                document.getElementById('speaker').innerText = line.speaker;
+                document.getElementById('dialogue-text').innerHTML = displayHtml;
+                if (portraitFile) setCharacterPortrait(portraitFile);
+                if (bgFile) setBackground(bgFile);
+                dialogueIndex++;
+            } else {
+                if (scene.options && scene.options.length > 0) {
+                    showOptionsPanel(scene.options);
+                } else if (scene.nextScene) {
+                    loadScene(scene.nextScene);
+                } else if (scene.final) {
+                    showEnding();
+                }
+            }
+        };
+        optArea.appendChild(nextBtn);
+    }
+
+    function showOptionsPanel(options) {
+        const optArea = document.getElementById('options-area');
+        optArea.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = opt.text;
+            btn.onclick = () => {
+                if (opt.stressDelta !== undefined) {
+                    addChange(opt.stressDelta, opt.calmDelta);
+                }
+                if (opt.text.includes("What the dog doing") ||
+                    opt.text.includes("你說得對，但你說得對") ||
+                    opt.text.includes("咕咕嘎嘎") ||
+                    opt.text.includes("一個晚上一個奇跡")) {
+                    nonsenseCount++;
+                }
+                const branchScene = scenes[opt.branch];
+                if (branchScene) {
+                    currentDialogues = branchScene.dialogues ? [...branchScene.dialogues] : [];
+                    dialogueIndex = 0;
+                    pendingNextScene = branchScene.nextScene || "check_ending";
+                    pendingPsychNote = branchScene.psychNote || null;
+                    pendingPsychNoteEn = branchScene.psychNoteEn || null;
+                    if (currentDialogues.length > 0) {
+                        const first = currentDialogues[0];
+                        const { cleanText, portraitFile, bgFile } = processDialogueLine(first.text, first.speaker);
+                        const textEn = first.textEn || "";
+                        let displayHtml = cleanText;
+                        if (textEn) displayHtml += `<div class="dialogue-en">${textEn}</div>`;
+                        document.getElementById('speaker').innerText = first.speaker;
+                        document.getElementById('dialogue-text').innerHTML = displayHtml;
+                        if (portraitFile) setCharacterPortrait(portraitFile);
+                        if (bgFile) setBackground(bgFile);
+                        dialogueIndex = 1;
+                    } else {
+                        document.getElementById('dialogue-text').innerHTML = "（繼續）";
+                    }
+                    optArea.innerHTML = '';
+                    const contBtn = document.createElement('button');
+                    contBtn.className = 'continue-btn';
+                    contBtn.innerText = '繼續 →';
+                    contBtn.onclick = () => advanceDialogue();
+                    optArea.appendChild(contBtn);
+                } else if (opt.next) {
+                    loadScene(opt.next);
+                } else {
+                    showEnding();
+                }
+            };
+            optArea.appendChild(btn);
+        });
+    }
+
+    // 結局逐句顯示（含中英對照心理筆記，支援中途背景切換）
+    function showEnding() {
+        const stress = stats.stress;
+        let endingDialogues = [];
+        let endingBg = "";
+        let endingPsychNote = "";
+        let endingPsychNoteEn = "";
+
+        if (nonsenseCount >= 4) {
+            endingBg = "FU8.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓靠自己完成了面試。", textEn: "Bai Zi completed the interview on her own." },
+                { speaker: "旁白", text: "據說因為考官也很喜歡謎因。", textEn: "It's said the interviewer also loved memes." },
+                { speaker: "旁白", text: "而白梓不留意的一句謎因逗笑了考官，因此收到了錄取。", textEn: "An offhand meme from Bai Zi made the interviewer laugh, so she got accepted." },
+                { speaker: "旁白", text: "但在白梓走出公司時世界發生了劇變。", textEn: "But as she stepped out of the company, the world changed drastically." },
+                { speaker: "旁白", text: "她發現路上的每個人都變成了企鵝。", textEn: "She found that everyone on the street had turned into penguins." },
+                { speaker: "旁白", text: "他們嘴上喊著咕咕嘎嘎。", textEn: "They were all chanting 'Gu Gu Ga Ga'." },
+                { speaker: "白梓", text: "不好意思，你知道最近的車站怎麼走嗎？", textEn: "Excuse me, do you know the way to the nearest station?" },
+                { speaker: "企鵝", text: "咕咕嘎嘎？", textEn: "Gu Gu Ga Ga?" },
+                { speaker: "白梓", text: "不好意思？", textEn: "Excuse me?" },
+                { speaker: "企鵝", text: "咕咕嘎嘎？", textEn: "Gu Gu Ga Ga?" },
+                { speaker: "白梓", text: "...咕咕嘎嘎?（play mp3）", textEn: "...Gu Gu Ga Ga? (play mp3)" },
+                { speaker: "企鵝", text: "咕咕嘎嘎！", textEn: "Gu Gu Ga Ga!" },
+                { speaker: "旁白", text: "白梓放棄了和企鵝的對話。", textEn: "Bai Zi gave up talking to the penguin." },
+                { speaker: "旁白", text: "並打算第一時間找你分享這份好消息。", textEn: "She planned to share the good news with you immediately." },
+                { speaker: "旁白", text: "但當她來到你面前時，她也變成了一隻企鵝。(FU4.jpg)", textEn: "But when she came to you, she had also turned into a penguin. (FU14)" },
+                { speaker: "白梓", text: "咕咕嘎嘎?（play mp3）(FUP14)", textEn: "Gu Gu Ga Ga! (FUP14)" },
+                { speaker: "白梓", text: "咕咕嘎嘎！（play mp3）", textEn: "Gu Gu Ga Ga?" },
+                { speaker: "白梓", text: "咕咕嘎嘎！！！", textEn: "Gu Gu Ga Ga!!!" },
+                { speaker: "旁白", text: "白梓發現自己變成了一隻企鵝，難以置信地哀嚎了起來。", textEn: "Bai Zi realized she'd become a penguin and wailed in disbelief." },
+                { speaker: "旁白", text: "而當你剛疑惑的想問家裡為什麼進來一隻企鵝的時候。", textEn: "Just as you were about to ask why a penguin had entered your home..." },
+                { speaker: "你", text: "咕咕嘎嘎。", textEn: "Gu Gu Ga Ga." },
+                { speaker: "旁白", text: "你發現你只能發出咕咕嘎嘎的聲音。", textEn: "You realized you could only make 'Gu Gu Ga Ga' sounds." },
+                { speaker: "旁白", text: "低頭一看，你的身體也變成了企鵝形狀。", textEn: "Looking down, you saw your body had turned into a penguin's." },
+                { speaker: "旁白", text: "謎因污染出現了人傳人的症狀。", textEn: "Meme contagion had become person-to-person." },
+                { speaker: "旁白", text: "過了幾天，整個社會都變成了只會咕咕嘎嘎的企鵝。(FU15)", textEn: "A few days later, all of society had become penguins that only say 'Gu Gu Ga Ga'. (FU15)" },
+                { speaker: "旁白", text: "人類一敗塗地。", textEn: "Humanity is utterly defeated." },
+                { speaker: "旁白", text: "接下來接管地球的是企鵝社會。", textEn: "Next, penguin society takes over the Earth." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局反映了過度使用幽默和逃避現實的極端後果。當人們不斷用廢話和迷因逃避壓力時，可能導致對現實的認知扭曲，最終與社會脫節。";
+            endingPsychNoteEn = "This ending reflects the extreme consequences of excessive humor and escapism. When people constantly use nonsense and memes to avoid stress, it can lead to cognitive distortion of reality and ultimately social disconnection.";
+        }
+        else if (stress <= 0) {
+            endingBg = "FU5.webp";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓游刃有餘地完成了面試。", textEn: "Bai Zi completed the interview with ease." },
+                { speaker: "旁白", text: "由於白梓和你一起時感覺非常放鬆。", textEn: "Because she feels very relaxed when she's with you..." },
+                { speaker: "旁白", text: "她每次有困難或情緒時，都會來找你。", textEn: "Whenever she has problems or emotions, she comes to you." },
+                { speaker: "旁白", text: "噔⬈噔⮕噔⮕噔⬊噔⬊噔⮕噔⮕噔⬊ 。(手機鈴聲)（play mp3）", textEn: "Ring ring ring... (phone rings) (play mp3)" },
+                { speaker: "白梓", text: "完啦！我剛才把水倒在老闆身上了。我是不是要被處理了。(FUP5)", textEn: "Oh no! I just spilled water on the boss. Am I going to be fired? (FUP5)" },
+                { speaker: "白梓", text: "全能的多啦欸夢，快幫我想辦法！", textEn: "All-powerful Doraemon, help me think of something!" },
+                { speaker: "旁白", text: "對於這種被依賴的感覺，你痛並快樂著。", textEn: "This feeling of being depended upon makes you feel both pain and joy." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局展現了「過度依賴」的人際關係模式。當一方總是充當拯救者，另一方會形成習得性依賴，這可能阻礙個體獨立成長。健康的人際關係應建立在相互支持的基礎上，而非單向的依賴。";
+            endingPsychNoteEn = "This ending shows an 'over-dependence' relationship pattern. When one side always acts as the rescuer, the other develops learned dependence, which can hinder independent growth. Healthy relationships should be based on mutual support, not one-sided dependence.";
+        }
+        else if (stress > 0 && stress <= 25) {
+            endingBg = "FU6.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓有條不亂地完成了面試。", textEn: "Bai Zi completed the interview methodically." },
+                { speaker: "旁白", text: "由於你提供了白梓很多幫助，協助她度過人生難關。", textEn: "Because you offered Bai Zi so much help, helping her through life's difficulties..." },
+                { speaker: "旁白", text: "對於多次拯救她於水火中的你，她自然地產生了不一樣的情愫。", textEn: "She naturally developed special feelings for you, who had saved her from trouble so many times." },
+                { speaker: "旁白", text: "但她也知道，如果想更進一步的話，不能凡事都靠你幫忙。", textEn: "But she also knew that if she wanted to take things further, she couldn't rely on you for everything." },
+                { speaker: "旁白", text: "所以她想追上你的步伐，和你一起並肩前行。", textEn: "So she wants to catch up to you and walk side by side with you." },
+                { speaker: "白梓", text: "我在這邊！(FUP6)", textEn: "I'm over here! (FUP6)" },
+                { speaker: "白梓", text: "今天要玩東西很多呢，我們要抓緊時間！", textEn: "There's so much to do today, we need to hurry!" }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局體現了「健康的依戀關係」。白梓在獲得幫助後，產生了想要與你並肩前行的動力，這符合社會學習理論中「正向榜樣」的激勵作用，也體現了親密關係中相互成長的可能性。";
+            endingPsychNoteEn = "This ending reflects a 'healthy attachment relationship'. After receiving help, Bai Zi gains the motivation to walk alongside you, which aligns with the motivational effect of 'positive role models' in Social Learning Theory, and demonstrates the possibility of mutual growth in intimate relationships.";
+        }
+        else if (stress > 25 && stress < 50) {
+            endingBg = "FU4.jpg";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓順利地完成了面試。", textEn: "Bai Zi completed the interview smoothly." },
+                { speaker: "旁白", text: "你們約好了在她家裡慶祝。", textEn: "You agreed to celebrate at her home." },
+                { speaker: "白梓", text: "要不是你幫了我，我面試還沒那麼順利呢！(FUP7)", textEn: "If it weren't for your help, I wouldn't have done so well in the interview! (FUP7)" },
+                { speaker: "白梓", text: "謝謝你！你真是個好人！", textEn: "Thank you! You're such a good person!" }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局展現了「社會支持」的重要性。適度的壓力在得到有效支持後轉化為正面結果，體現了社會支持系統對壓力緩衝的作用。";
+            endingPsychNoteEn = "This ending shows the importance of 'social support'. Moderate stress, when effectively supported, leads to positive outcomes, illustrating the stress-buffering effect of social support systems.";
+        }
+        else if (stress === 50) {
+            endingBg = "FU8.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓靠自己完成了面試。", textEn: "Bai Zi completed the interview on her own." },
+                { speaker: "旁白", text: "面試結束後，她立即想和你分享這則好消息。(FUP8)", textEn: "After the interview, she immediately wanted to share the good news with you. (FUP8)" },
+                { speaker: "旁白", text: "但在消息發送的前一刻，她猶豫了。", textEn: "But just before sending the message, she hesitated." },
+                { speaker: "旁白", text: "因為你一時令她放鬆，一時又對她上壓力。", textEn: "Because sometimes you relaxed her, sometimes you added pressure." },
+                { speaker: "旁白", text: "這種一時一個樣的做法令她猜不透你的想法。", textEn: "This inconsistent behavior made her unsure of your intentions." },
+                { speaker: "旁白", text: "這種失控的感覺令她產生了一絲不安全感。", textEn: "This feeling of losing control gave her a slight sense of insecurity." },
+                { speaker: "旁白", text: "而出於自我保護的心理，她最終決定和你拉開距離。", textEn: "Out of self-protection, she ultimately decided to distance herself from you." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局反映了「矛盾型依戀」的困擾。當支持行為不一致時，會讓對方產生不安全感，進而選擇自我保護地保持距離。這說明人際關係中的一致性對建立信任至關重要。";
+            endingPsychNoteEn = "This ending reflects the trouble of 'ambivalent attachment'. Inconsistent supportive behavior creates insecurity, leading to self-protective distancing. This shows that consistency is crucial for building trust in relationships.";
+        }
+        else if (stress > 50 && stress < 98) {
+            endingBg = "FU8.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓把壓力化為了動力，完成了面試。", textEn: "Bai Zi turned pressure into motivation and completed the interview." },
+                { speaker: "旁白", text: "雖然人們總說有壓力才有動力。", textEn: "Although people say pressure creates motivation..." },
+                { speaker: "旁白", text: "但白梓卻不喜歡有壓力的感覺。", textEn: "Bai Zi doesn't like the feeling of pressure." },
+                { speaker: "旁白", text: "在白梓想把這則消息分享給你的前一刻。(FUP9)", textEn: "Just before Bai Zi wanted to share this news with you... (FUP9)" },
+                { speaker: "旁白", text: "她想到了和你交流時所得到的壓力。", textEn: "She thought about the pressure she got from interacting with you." },
+                { speaker: "旁白", text: "她害怕在壓力被釋放的這一刻，再被加上新的壓力。", textEn: "She was afraid that just when she'd released pressure, new pressure would be added." },
+                { speaker: "旁白", text: "最終白梓選擇逃避這種壓力。", textEn: "In the end, Bai Zi chose to escape that pressure." },
+                { speaker: "旁白", text: "從此白梓再也沒有聯繫過你。", textEn: "From then on, Bai Zi never contacted you again." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局展示了「壓力轉化」的負面版本。雖然壓力成功轉化為動力，但對壓力的厭惡導致逃避行為，這是「壓力敏感型」人格的典型反應。長期來看，這可能阻礙壓力應對能力的發展。";
+            endingPsychNoteEn = "This ending shows a negative version of 'pressure transformation'. Although pressure was successfully turned into motivation, aversion to pressure leads to avoidance, typical of 'pressure-sensitive' personalities. In the long run, this can hinder the development of stress-coping skills.";
+        }
+        else if (stress === 99) {
+            endingBg = "FU8.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "快要被壓垮的白梓把巨大的壓力化為了動力，超常發揮並完成了面試。", textEn: "Bai Zi, nearly crushed, turned immense pressure into motivation, performed exceptionally, and completed the interview." },
+                { speaker: "旁白", text: "白梓的表現驚艷了考官，被破例成為公司重點培養對象。", textEn: "Bai Zi's performance amazed the interviewer, and she was exceptionally selected as a key training candidate." },
+                { speaker: "旁白", text: "不出2個月，白梓完美的完成了公司的所有培訓和任務。", textEn: "Within two months, Bai Zi completed all company training and tasks perfectly." },
+                { speaker: "旁白", text: "她證明了自己，並成為了核心公司人員。", textEn: "She proved herself and became a core employee." },
+                { speaker: "旁白", text: "在她成功後回來找到了你，並打算聘請你作為她的私人秘書。(FU11)", textEn: "After her success, she returned to you and intended to hire you as her personal assistant. (FU11)" },
+                { speaker: "旁白", text: "看著她病態的眼神和寫著可怕條件的合約，你本能的想拒絕。", textEn: "Looking at her sickly eyes and the contract with terrifying conditions, you instinctively wanted to refuse." },
+                { speaker: "旁白", text: "但奈何她給得實在是太多了。", textEn: "But she offered too much money." },
+                { speaker: "旁白", text: "之後她將你限制了她家裡，你負責她的起居飲食和一切需求。", textEn: "Then she confined you to her home, and you were responsible for her daily needs and everything else." },
+                { speaker: "旁白", text: "隨著時間的過去，和外界的脫節使你失去了自主性。", textEn: "As time passed, disconnection from the outside world made you lose your autonomy." },
+                { speaker: "旁白", text: "你習慣了對白梓唯命是從，討好白梓成為了你的生存方式。", textEn: "You became accustomed to obeying Bai Zi, and pleasing her became your way of survival." },
+                { speaker: "旁白", text: "而這些都是因為在巨大的壓力下。", textEn: "All because under immense pressure..." },
+                { speaker: "旁白", text: "白梓所僅存的一點理智就是得到你的認同，得到你的誇獎。", textEn: "Bai Zi's only remaining sanity was to gain your approval and praise." },
+                { speaker: "旁白", text: "而這種渴望漸漸變成執念，也異化了她本來的慾望。", textEn: "This desire gradually turned into an obsession, alienating her original desires." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局展現了「認同渴求」的極端異化。當個體將自我價值完全寄託於他人認同時，可能發展出控制型依戀關係，這與社會認同理論中過度尋求內團體認同的負面影響一致。";
+            endingPsychNoteEn = "This ending shows the extreme alienation of 'need for approval'. When an individual completely pins their self-worth on others' approval, they may develop a controlling attachment, consistent with the negative effects of excessive ingroup identification in Social Identity Theory.";
+        }
+        else if (stress >= 100) {
+            endingBg = "FU12.png";
+            endingDialogues = [
+                { speaker: "旁白", text: "白梓在過大的壓力下面試失手。", textEn: "Bai Zi botched the interview due to excessive pressure." },
+                { speaker: "旁白", text: "被壓力反噬的白梓從此把自己關在房間內。(FUP12)", textEn: "Crushed by pressure, Bai Zi shut herself in her room. (FUP12)" },
+                { speaker: "旁白", text: "不再試圖努力找工作，也不再進行任何社交。", textEn: "She no longer tries to find a job or engage in any social activities." },
+                { speaker: "旁白", text: "自暴自棄的在房間內自甘墮落。", textEn: "She wallows in self-abandonment in her room." },
+                { speaker: "旁白", text: "之後你也沒有再見過白梓了。", textEn: "After that, you never saw Bai Zi again." }
+            ];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：這個結局說明了「壓力崩潰」的嚴重後果。當壓力超過個體承受閾值且缺乏有效應對資源時，可能導致習得性無助，使人陷入自我封閉的狀態。";
+            endingPsychNoteEn = "This ending illustrates the severe consequences of 'stress collapse'. When pressure exceeds an individual's threshold and effective coping resources are lacking, it can lead to learned helplessness, trapping a person in a state of self-isolation.";
+        }
+        else {
+            endingBg = "ending_default.png";
+            endingDialogues = [{ speaker: "系統", text: "故事結束。", textEn: "The story ends." }];
+            endingPsychNote = "💡 心理筆記 / Psychology Note：故事告一段落，但人生的壓力管理永遠在路上。學會識別壓力信號、建立支持系統、培養健康應對策略，是每個人成長的必修課。";
+            endingPsychNoteEn = "The story comes to an end, but stress management in life is an ongoing journey. Learning to recognize stress signals, building a support system, and developing healthy coping strategies are essential courses for everyone's growth.";
+        }
+
+        // 添加心理筆記到結局對話末尾
+        endingDialogues.push({ speaker: "💡 心理筆記", text: endingPsychNote, textEn: endingPsychNoteEn });
+
+        // 設置結局背景，並清空立繪
+        setBackground(endingBg);
+        setCharacterPortrait(null);
+
+        // 逐句播放結局
+        let endingIndex = 0;
+        const optArea = document.getElementById('options-area');
+        optArea.innerHTML = '';
+        const speakerEl = document.getElementById('speaker');
+        const textEl = document.getElementById('dialogue-text');
+
+        function showNextEndingLine() {
+            if (endingIndex < endingDialogues.length) {
+                const line = endingDialogues[endingIndex];
+                const { cleanText, portraitFile, bgFile } = processDialogueLine(line.text, line.speaker);
+                const textEn = line.textEn || "";
+                if (line.speaker === "💡 心理筆記") {
+                    speakerEl.innerText = "";
+                    let noteHtml = `<div class="psych-note">${cleanText}`;
+                    if (textEn) noteHtml += `<div class="psych-note-en">${textEn}</div>`;
+                    noteHtml += `</div>`;
+                    textEl.innerHTML = noteHtml;
+                } else {
+                    speakerEl.innerText = line.speaker;
+                    let displayHtml = cleanText;
+                    if (textEn) displayHtml += `<div class="dialogue-en">${textEn}</div>`;
+                    textEl.innerHTML = displayHtml;
+                    if (portraitFile) setCharacterPortrait(portraitFile);
+                    if (bgFile) setBackground(bgFile);
+                }
+                endingIndex++;
+            } else {
+                optArea.innerHTML = '';
+                const resetBtn = document.createElement('button');
+                resetBtn.className = 'option-btn';
+                resetBtn.innerText = "🔄 重新挑戰 / Retry";
+                resetBtn.onclick = () => location.reload();
+                const homeBtn = document.createElement('button');
+                homeBtn.className = 'option-btn';
+                homeBtn.innerText = "🏠 返回首頁 / Home";
+                homeBtn.onclick = () => { window.location.href = 'home.html'; };
+                optArea.appendChild(resetBtn);
+                optArea.appendChild(homeBtn);
+            }
+        }
+
+        showNextEndingLine();
+        const contBtn = document.createElement('button');
+        contBtn.className = 'continue-btn';
+        contBtn.innerText = '繼續 →';
+        contBtn.onclick = showNextEndingLine;
+        optArea.appendChild(contBtn);
+    }
+
+    function init() {
+        updateUI();
+        loadScene("start");
+    }
+    init();
+</script>
+</body>
+</html>
